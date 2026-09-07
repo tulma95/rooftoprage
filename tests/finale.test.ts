@@ -7,11 +7,16 @@ import { makePlayer } from '../shared/game.js';
 
 function finish(reason = 'fell off the roof') {
   const sim = new Simulation();
-  sim.state.players = [makePlayer('a', 'A', 'ram', 'cannon', 0), makePlayer('b', 'B', 'saw', 'cannon', 1)];
-  sim.start(); sim.state.phase = 'combat';
+  sim.state.players = [
+    makePlayer('a', 'A', 'ram', 'cannon', 0),
+    makePlayer('b', 'B', 'saw', 'cannon', 1),
+  ];
+  sim.start();
+  sim.state.phase = 'combat';
   sim.state.players[1]!.x = 29;
   const previous = structuredClone(sim.state);
-  sim.eliminate(sim.state.players[1]!, reason, 'a'); sim.finishIfNeeded();
+  sim.eliminate(sim.state.players[1]!, reason, 'a');
+  sim.finishIfNeeded();
   return { previous, next: sim.state };
 }
 test('finale selects only a fresh decisive combat elimination', () => {
@@ -27,8 +32,12 @@ test('finale selects only a fresh decisive combat elimination', () => {
 });
 test('fall cinematic descends, destruction stays on roof, and skip/expiry clears debris', () => {
   for (const reason of ['fell off the roof', 'destroyed']) {
-    const { previous, next } = finish(reason), scene = new THREE.Scene(), finale = new Finale(scene);
-    const camera = new THREE.PerspectiveCamera(), target = new THREE.Vector3(), victim = new THREE.Group();
+    const { previous, next } = finish(reason),
+      scene = new THREE.Scene(),
+      finale = new Finale(scene);
+    const camera = new THREE.PerspectiveCamera(),
+      target = new THREE.Vector3(),
+      victim = new THREE.Group();
     const before = structuredClone(next);
     finale.start(finalElimination(previous, next)!, 0);
     for (let i = 0; i < 120; i++) finale.step(1 / 60, victim, camera, target);
@@ -38,7 +47,8 @@ test('fall cinematic descends, destruction stays on roof, and skip/expiry clears
     finale.step(2, victim, camera, target);
     assert.equal(finale.active, false);
     assert.equal(scene.children[0]!.visible, false);
-    finale.start(finalElimination(previous, next)!, 0); finale.stop();
+    finale.start(finalElimination(previous, next)!, 0);
+    finale.stop();
     assert.equal(finale.active, false);
   }
 });

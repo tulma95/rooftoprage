@@ -1,3 +1,4 @@
+import { City } from './city.js';
 import { Finale, finalElimination } from './finale.js';
 import { ArenaHazards } from './hazards.js';
 import { driveTerrain } from '../shared/hazards.js';
@@ -279,12 +280,27 @@ function robot(
   burn.rotation.x = -Math.PI / 2;
   burn.scale.setScalar(0.65);
   group.add(burn);
-  return { chassis, group, burn, wheels, saw, hammer, drill, barrel, flame, front, top, speed: 0, impact: 0, impactAge: 0 };
+  return {
+    chassis,
+    group,
+    burn,
+    wheels,
+    saw,
+    hammer,
+    drill,
+    barrel,
+    flame,
+    front,
+    top,
+    speed: 0,
+    impact: 0,
+    impactAge: 0,
+  };
 }
 
 export class GameScene {
   private scene = new THREE.Scene();
-  private camera = new THREE.PerspectiveCamera(48, 1, 0.1, 240);
+  private camera = new THREE.PerspectiveCamera(48, 1, 0.1, 650);
   private renderer: THREE.WebGLRenderer;
   private robots = new Map<string, Robot>();
   private previewRobot: Robot;
@@ -297,6 +313,7 @@ export class GameScene {
   private clock = new THREE.Clock();
   private shakeEnabled = true;
   private shake = 0;
+  private city = new City();
   private hazards = new ArenaHazards();
   private effects: WeaponEffects;
   private finale: Finale;
@@ -316,8 +333,8 @@ export class GameScene {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.3;
-    this.scene.background = new THREE.Color('#141f22');
-    this.scene.fog = new THREE.FogExp2('#263536', 0.011);
+    this.scene.background = new THREE.Color('#243b49');
+    this.scene.fog = new THREE.FogExp2('#354b57', 0.0038);
     this.scene.add(new THREE.HemisphereLight('#c9e0d8', '#43362a', 2.5));
     const sun = new THREE.DirectionalLight('#ffdb9c', 3.1);
     sun.position.set(-16, 35, 12);
@@ -336,6 +353,7 @@ export class GameScene {
     this.effects = new WeaponEffects(this.scene);
     this.finale = new Finale(this.scene);
     this.buildArena();
+    this.scene.add(this.city.group);
     this.scene.add(this.hazards.group);
     this.previewRobot = robot('ram', 'cannon', '#e6aa3c');
     this.scene.add(this.previewRobot.group);
@@ -353,7 +371,7 @@ export class GameScene {
       }),
       lines = new THREE.MeshStandardMaterial({ color: '#b99b45', roughness: 0.9 });
     box(this.scene, 0, -0.4, 0, ARENA_HALF * 2, 0.8, ARENA_HALF * 2, concrete);
-    box(this.scene, 0, -3, 0, ARENA_HALF * 2 - 1, 5, ARENA_HALF * 2 - 1, dark);
+
     // Roof expansion joints and inset safety stripes leave the edge entirely open.
     for (let i = -ARENA_HALF + 4; i < ARENA_HALF; i += 4) {
       box(this.scene, i, 0.005, 0, 0.026, 0.012, ARENA_HALF * 2 - 1, steel);
@@ -372,32 +390,8 @@ export class GameScene {
       box(this.scene, side * 10, 0.018, 0, 3, 0.015, 0.1, lines);
       box(this.scene, 0, 0.018, side * 10, 0.1, 0.015, 3, lines);
     }
-    // All buildings and equipment stand outside the combat roof.
-    for (let i = 0; i < 42; i++) {
-      const angle = i * 2.39996;
-      const radius = ARENA_HALF + 20 + (i % 5) * 10;
-      const h = 6 + ((i * 17) % 24);
-      const x = Math.sin(angle) * radius,
-        z = Math.cos(angle) * radius;
-      const mat = new THREE.MeshStandardMaterial({
-        color: new THREE.Color().setHSL(0.43, 0.07, 0.17 + (i % 4) * 0.025),
-        roughness: 1,
-      });
-      box(this.scene, x, h / 2 - 18, z, 7 + (i % 3) * 3, h, 7 + (i % 4), mat);
-      for (let floor = 0; floor < h - 2; floor += 3)
-        box(this.scene, x, h - 19 - floor, z + 4 + (i % 4) / 2, 4, 0.22, 0.03, steel);
-      box(this.scene, x, h - 17.6, z, 3, 0.8, 2, steel);
-    }
-    for (const x of [-ARENA_HALF - 5, ARENA_HALF + 5]) {
-      box(this.scene, x, -1, 0, 3, 3, 9, steel);
-      for (let z = -3; z <= 3; z += 3) cylinder(this.scene, x, 0.65, z, 1, 0.25, dark);
-    }
-    const mast = new THREE.Group();
-    mast.position.set(-ARENA_HALF - 8, -3, -20);
-    box(mast, 0, 6, 0, 0.25, 12, 0.25, silver);
-    box(mast, 0, 10, 0, 4, 0.15, 0.15, steel);
-    this.scene.add(mast);
   }
+
   preview(front: FrontWeapon, top: TopWeapon, chassis: Chassis = 'mule'): void {
     if (
       this.previewRobot.front === front &&
@@ -412,8 +406,11 @@ export class GameScene {
   update(state: RoomState | null, localId: string, input: Input, spectatorId?: string): void {
     if (state !== this.priorState) {
       const finishingEvent = finalElimination(this.priorState, state);
-      if (finishingEvent) this.finale.start(finishingEvent,
-        state!.players.find(p => p.id === finishingEvent.playerId)?.yaw ?? 0);
+      if (finishingEvent)
+        this.finale.start(
+          finishingEvent,
+          state!.players.find((p) => p.id === finishingEvent.playerId)?.yaw ?? 0,
+        );
       if (!state || state.phase !== 'results') this.finale.stop();
       if (state?.code !== this.priorState?.code || state?.round !== this.priorState?.round) {
         this.seenEvents.clear();
@@ -440,8 +437,12 @@ export class GameScene {
     this.input = { ...input };
     this.spectatorId = spectatorId ?? '';
   }
-  get cinematicActive(): boolean { return this.finale.active; }
-  skipCinematic(): void { this.finale.stop(); }
+  get cinematicActive(): boolean {
+    return this.finale.active;
+  }
+  skipCinematic(): void {
+    this.finale.stop();
+  }
   setCameraShake(enabled: boolean): void {
     this.shakeEnabled = enabled;
   }
@@ -495,7 +496,11 @@ export class GameScene {
     const cooldown = WEAPONS[r.top].cooldown,
       elapsed = cooldown - (p?.topCooldown ?? 0);
     r.barrel.position.z =
-      -0.13 - (cooldown > 0 && p && p.topCooldown > 0 ? Math.max(0, 1 - elapsed / 0.16) * (r.top === 'cannon' ? 0.42 : r.top === 'scattergun' ? 0.3 : 0.18) : 0);
+      -0.13 -
+      (cooldown > 0 && p && p.topCooldown > 0
+        ? Math.max(0, 1 - elapsed / 0.16) *
+          (r.top === 'cannon' ? 0.42 : r.top === 'scattergun' ? 0.3 : 0.18)
+        : 0);
   }
   private frame(): void {
     const dt = Math.min(this.clock.getDelta(), 0.05),
@@ -513,6 +518,7 @@ export class GameScene {
       !!this.state && ['loading', 'countdown', 'combat', 'results'].includes(this.state.phase);
     this.previewRobot.group.visible = !combat;
     this.aim = null;
+    this.city.update(time);
     this.hazards.update(this.state, combat, time);
     if (combat && this.state) {
       if (this.camera.view?.enabled) this.camera.clearViewOffset();
@@ -568,14 +574,23 @@ export class GameScene {
       if (r && !this.finale.active) {
         const yaw = r.group.rotation.y,
           pos = r.group.position;
+        const edge = Math.max(Math.abs(pos.x), Math.abs(pos.z));
+        const outward =
+          (pos.x * Math.sin(yaw) + pos.z * Math.cos(yaw)) / Math.max(1, Math.hypot(pos.x, pos.z));
+        const vertigo =
+          Math.max(0, Math.min(1, (edge - ARENA_HALF + 8) / 7)) * Math.max(0, outward);
         const cameraPos = new THREE.Vector3(
-          pos.x - Math.sin(yaw) * 9,
-          6.4,
-          pos.z - Math.cos(yaw) * 9,
+          pos.x - Math.sin(yaw) * (9 - vertigo * 3),
+          6.4 + vertigo * 4,
+          pos.z - Math.cos(yaw) * (9 - vertigo * 3),
         );
         this.camera.position.lerp(cameraPos, 1 - Math.exp(-dt * 6));
         this.target.lerp(
-          new THREE.Vector3(pos.x + Math.sin(yaw) * 3, 0.6, pos.z + Math.cos(yaw) * 3),
+          new THREE.Vector3(
+            pos.x + Math.sin(yaw) * (3 + vertigo * 5),
+            0.6 - vertigo * 9,
+            pos.z + Math.cos(yaw) * (3 + vertigo * 5),
+          ),
           1 - Math.exp(-dt * 10),
         );
         if (watched?.id === this.localId)
@@ -597,11 +612,11 @@ export class GameScene {
             const distance = Math.hypot(event.x - watched.x, event.z - watched.z);
             this.shake = Math.min(0.24, this.shake + Math.max(0, 1 - distance / 20) * 0.16);
           }
-            this.effects.burst(
-              event.x,
-              event.z,
-              event.type === 'elimination' || event.type === 'explosion',
-            );
+          this.effects.burst(
+            event.x,
+            event.z,
+            event.type === 'elimination' || event.type === 'explosion',
+          );
         }
       if (this.seenEvents.size > 2000) this.seenEvents = new Set(state.events.map((e) => e.id));
       this.effects.sync(state.projectiles);
@@ -615,7 +630,12 @@ export class GameScene {
       this.target.lerp(new THREE.Vector3(0, 0.65, 0), 0.06);
       this.animateRobot(this.previewRobot, undefined, time, dt);
     }
-    this.finale.step(dt, this.robots.get(this.finale.victimId ?? '')?.group, this.camera, this.target);
+    this.finale.step(
+      dt,
+      this.robots.get(this.finale.victimId ?? '')?.group,
+      this.camera,
+      this.target,
+    );
     if (this.finale.active) this.aim = null;
     this.effects.step(dt);
     this.shake *= Math.exp(-dt * 13);

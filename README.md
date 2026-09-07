@@ -23,6 +23,22 @@ See [`package.json`](package.json) for build, formatting, and test commands.
 
 Browser checks require Google Chrome and a running local game. Run `npm run test:browser` in a separate terminal; set `BROWSER_URL` if using a different address.
 
+Checks performed for the presentation changes:
+
+- `npm run typecheck` — TypeScript correctness.
+- `node --import tsx --test tests/*.test.ts` — 43 existing game, bot, multiplayer, and rendering tests.
+- `node --import tsx --test tests/finale.test.ts tests/weapon-effects.test.ts` — Cinematic triggers, cleanup, state isolation, and effect pooling.
+- `npm run build` — Production browser and server builds.
+- `npm run format:check` — Repository formatting.
+- `node scripts/presentation-browser-check.mjs` — Edge view, final fall, cinematic expiry, and round reset.
+- `node scripts/bots-browser-check.mjs` — Solo combat, results, rematch, and leaving.
+- Screenshot inspection — Checked edge framing and the falling robot visually.
+- `git diff --check` and `git status --short` — Whitespace errors and uncommitted changes.
+
+The direct Node test command bypassed a sandbox restriction on the `npm test` runner's IPC socket. Browser checks completed without page errors.
+
+See [combat presentation](docs/combat-presentation.md) for the effects, cinematic, settings, and city details.
+
 ## Hosting
 
 Use `./deploy.sh --help` for container publishing and Coolify deployment instructions.

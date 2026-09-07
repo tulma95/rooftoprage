@@ -17,8 +17,11 @@ export function tone(hit: boolean, enabled: boolean) {
     if (hit) {
       const buffer = audio.createBuffer(1, Math.ceil(audio.sampleRate * 0.18), audio.sampleRate);
       const samples = buffer.getChannelData(0);
-      for (let i = 0; i < samples.length; i++) samples[i] = (Math.random() * 2 - 1) * (1 - i / samples.length) ** 2;
-      const noise = audio.createBufferSource(), filter = audio.createBiquadFilter(), metal = audio.createGain();
+      for (let i = 0; i < samples.length; i++)
+        samples[i] = (Math.random() * 2 - 1) * (1 - i / samples.length) ** 2;
+      const noise = audio.createBufferSource(),
+        filter = audio.createBiquadFilter(),
+        metal = audio.createGain();
       noise.buffer = buffer;
       filter.type = 'bandpass';
       filter.frequency.value = 1800;
@@ -26,7 +29,11 @@ export function tone(hit: boolean, enabled: boolean) {
       metal.gain.value = 0.12;
       noise.connect(filter).connect(metal).connect(audio.destination);
       noise.start();
-      noise.onended = () => { noise.disconnect(); filter.disconnect(); metal.disconnect(); };
+      noise.onended = () => {
+        noise.disconnect();
+        filter.disconnect();
+        metal.disconnect();
+      };
     }
     osc.onended = () => {
       osc.disconnect();
