@@ -633,9 +633,6 @@ kbd {
 .high-contrast {
   --muted: #d3ddd4;
 }
-.reduced-motion * {
-  transition: none !important;
-}
 @media (max-width: 1100px) {
   .hud-health {
     min-width: 190px;

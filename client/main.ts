@@ -65,10 +65,8 @@ function save() {
 }
 function applySettings() {
   music.setEnabled(settings.music);
-  scene.setQuality(settings.low);
-  scene.setReducedMotion(settings.reduced);
+  scene.setCameraShake(settings.shake);
   document.body.classList.toggle('high-contrast', settings.contrast);
-  document.body.classList.toggle('reduced-motion', settings.reduced);
 }
 applySettings();
 function local() {

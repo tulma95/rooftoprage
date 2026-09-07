@@ -34,8 +34,7 @@ export function settingsForm(settings: Settings) {
     [
       ['audio', 'Sound effects'],
       ['music', 'Synthwave music'],
-      ['low', 'Low graphics / reduced resolution'],
-      ['reduced', 'Reduce motion and effects'],
+      ['shake', 'Impact camera shake'],
       ['contrast', 'High contrast panels'],
     ] as const
   )

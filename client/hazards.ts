@@ -98,7 +98,7 @@ export class ArenaHazards {
         }
       }
   }
-  update(state: RoomState | null, combat: boolean, time: number, reduced: boolean): void {
+  update(state: RoomState | null, combat: boolean, time: number): void {
     this.group.visible = combat;
     this.tanks.forEach((tank, i) => {
       tank.visible = (state?.tanks?.[i]?.hp ?? 0) > 0;
@@ -106,7 +106,7 @@ export class ArenaHazards {
     this.fires.forEach((fire, i) => {
       fire.visible = (state?.oil?.[i]?.burning ?? 0) > 0;
       fire.children.forEach((m, j) => {
-        m.scale.y = reduced ? 1 : 0.8 + Math.sin(time * 9 + j) * 0.25;
+        m.scale.y = 0.8 + Math.sin(time * 9 + j) * 0.25;
       });
     });
   }

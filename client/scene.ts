@@ -26,6 +26,8 @@ interface Robot {
   front: FrontWeapon;
   top: TopWeapon;
   speed: number;
+  impact: number;
+  impactAge: number;
 }
 const steel = new THREE.MeshStandardMaterial({ color: '#3c4444', roughness: 0.78, metalness: 0.7 });
 const dark = new THREE.MeshStandardMaterial({ color: '#171d1c', roughness: 0.85, metalness: 0.4 });
@@ -276,7 +278,7 @@ function robot(
   burn.rotation.x = -Math.PI / 2;
   burn.scale.setScalar(0.65);
   group.add(burn);
-  return { chassis, group, burn, wheels, saw, hammer, drill, barrel, flame, front, top, speed: 0 };
+  return { chassis, group, burn, wheels, saw, hammer, drill, barrel, flame, front, top, speed: 0, impact: 0, impactAge: 0 };
 }
 
 export class GameScene {
@@ -292,7 +294,8 @@ export class GameScene {
   private lastSnapshot = 0;
   private priorState: RoomState | null = null;
   private clock = new THREE.Clock();
-  private reduced = false;
+  private shakeEnabled = true;
+  private shake = 0;
   private hazards = new ArenaHazards();
   private effects: WeaponEffects;
   private seenEvents = new Set<number>();
@@ -408,6 +411,7 @@ export class GameScene {
       if (state?.code !== this.priorState?.code || state?.round !== this.priorState?.round) {
         this.seenEvents.clear();
         this.effects.clear();
+        this.shake = 0;
       }
       if (
         state &&
@@ -429,12 +433,8 @@ export class GameScene {
     this.input = { ...input };
     this.spectatorId = spectatorId ?? '';
   }
-  setQuality(low: boolean): void {
-    this.renderer.setPixelRatio(low ? 1 : Math.min(window.devicePixelRatio, 2));
-    this.renderer.shadowMap.enabled = !low;
-  }
-  setReducedMotion(reduced: boolean): void {
-    this.reduced = reduced;
+  setCameraShake(enabled: boolean): void {
+    this.shakeEnabled = enabled;
   }
   aimScreen(): { x: number; y: number } | null {
     if (!this.aim) return null;
@@ -458,9 +458,14 @@ export class GameScene {
       if (![steel, dark, silver, rubber].includes(m as THREE.MeshStandardMaterial)) m.dispose();
   }
   private animateRobot(r: Robot, p: PlayerState | undefined, time: number, dt: number): void {
+    r.impactAge += dt;
+    r.impact *= Math.exp(-dt * 8);
+    r.group.rotation.x = Math.sin(r.impactAge * 32) * r.impact * 0.13;
+    r.group.rotation.z = Math.sin(r.impactAge * 25) * r.impact * 0.08;
+    r.group.position.y -= Math.abs(Math.sin(r.impactAge * 32)) * r.impact * 0.12;
     for (const w of r.wheels) w.rotation.x += (dt * r.speed) / 0.46;
-    if (r.saw) r.saw.rotation.y += dt * (p?.frontActive ? 35 : this.reduced ? 0 : 3);
-    if (r.drill) r.drill.rotation.z += dt * (p?.frontActive ? 29 : this.reduced ? 0 : 2.2);
+    if (r.saw) r.saw.rotation.y += dt * (p?.frontActive ? 35 : 3);
+    if (r.drill) r.drill.rotation.z += dt * (p?.frontActive ? 29 : 2.2);
     if (r.hammer) {
       // Interpolate between snapshots so the quick downswing still advances every frame.
       const elapsed =
@@ -475,13 +480,13 @@ export class GameScene {
     r.burn.visible = !!p?.burning;
     r.flame.visible = !!p?.topActive && r.top === 'flamethrower';
     r.flame.children.forEach((o, i) => {
-      o.scale.setScalar(this.reduced ? 1 : 1 + Math.sin(time * 35 + i) * 0.2);
-      o.rotation.z = this.reduced ? i : time * 6 + i;
+      o.scale.setScalar(1 + Math.sin(time * 35 + i) * 0.2);
+      o.rotation.z = time * 6 + i;
     });
     const cooldown = WEAPONS[r.top].cooldown,
       elapsed = cooldown - (p?.topCooldown ?? 0);
     r.barrel.position.z =
-      -0.13 - (cooldown > 0 && p && p.topCooldown > 0 ? Math.max(0, 1 - elapsed / 0.16) * 0.14 : 0);
+      -0.13 - (cooldown > 0 && p && p.topCooldown > 0 ? Math.max(0, 1 - elapsed / 0.16) * (r.top === 'cannon' ? 0.42 : r.top === 'scattergun' ? 0.3 : 0.18) : 0);
   }
   private frame(): void {
     const dt = Math.min(this.clock.getDelta(), 0.05),
@@ -499,7 +504,7 @@ export class GameScene {
       !!this.state && ['loading', 'countdown', 'combat', 'results'].includes(this.state.phase);
     this.previewRobot.group.visible = !combat;
     this.aim = null;
-    this.hazards.update(this.state, combat, time, this.reduced);
+    this.hazards.update(this.state, combat, time);
     if (combat && this.state) {
       if (this.camera.view?.enabled) this.camera.clearViewOffset();
       const state = this.state;
@@ -559,7 +564,7 @@ export class GameScene {
           6.4,
           pos.z - Math.cos(yaw) * 9,
         );
-        this.camera.position.lerp(cameraPos, this.reduced ? 1 : 1 - Math.exp(-dt * 6));
+        this.camera.position.lerp(cameraPos, 1 - Math.exp(-dt * 6));
         this.target.lerp(
           new THREE.Vector3(pos.x + Math.sin(yaw) * 3, 0.6, pos.z + Math.cos(yaw) * 3),
           1 - Math.exp(-dt * 10),
@@ -574,7 +579,15 @@ export class GameScene {
       for (const event of state.events)
         if (!this.seenEvents.has(event.id)) {
           this.seenEvents.add(event.id);
-          if (!this.reduced)
+          const victim = this.robots.get(event.playerId);
+          if (victim && (event.type === 'hit' || event.type === 'shot')) {
+            victim.impact = Math.min(1.5, victim.impact + (event.type === 'hit' ? 0.9 : 0.35));
+            victim.impactAge = 0;
+          }
+          if (event.type !== 'shot' && watched) {
+            const distance = Math.hypot(event.x - watched.x, event.z - watched.z);
+            this.shake = Math.min(0.24, this.shake + Math.max(0, 1 - distance / 20) * 0.16);
+          }
             this.effects.burst(
               event.x,
               event.z,
@@ -586,9 +599,7 @@ export class GameScene {
     } else {
       for (const r of this.robots.values()) r.group.visible = false;
       this.effects.clear();
-      this.previewRobot.group.rotation.y = this.reduced
-        ? -0.65
-        : -0.65 + Math.sin(time * 0.22) * 0.16;
+      this.previewRobot.group.rotation.y = -0.65 + Math.sin(time * 0.22) * 0.16;
       // Shift the preview into the right quarter, keeping long attachments clear of the garage cards.
       this.camera.setViewOffset(width, height, -width * 0.3, 0, width, height);
       this.camera.position.lerp(new THREE.Vector3(6.3, 4.5, 7.8), 0.06);
@@ -596,7 +607,13 @@ export class GameScene {
       this.animateRobot(this.previewRobot, undefined, time, dt);
     }
     this.effects.step(dt);
+    this.shake *= Math.exp(-dt * 13);
     this.camera.lookAt(this.target);
+    // Offset only the rendered view, avoiding drift in the follow-camera position.
+    if (combat && this.shakeEnabled) {
+      this.camera.rotateX(Math.sin(time * 73) * this.shake * 0.035);
+      this.camera.rotateZ(Math.sin(time * 91) * this.shake * 0.025);
+    }
     this.renderer.render(this.scene, this.camera);
   }
 }

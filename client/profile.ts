@@ -9,8 +9,7 @@ import {
 export interface Settings {
   audio: boolean;
   music: boolean;
-  low: boolean;
-  reduced: boolean;
+  shake: boolean;
   contrast: boolean;
 }
 export interface Profile {
@@ -26,7 +25,7 @@ export function loadProfile(): Profile {
     chassis: 'mule',
     front: 'ram',
     top: 'cannon',
-    settings: { audio: true, music: true, low: false, reduced: false, contrast: false },
+    settings: { audio: true, music: true, shake: true, contrast: false },
   };
   try {
     const saved = JSON.parse(localStorage.getItem('rooftop-profile') || '{}');
