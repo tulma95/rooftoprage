@@ -18,6 +18,7 @@ import {
 interface Robot {
   chassis: Chassis;
   group: THREE.Group;
+  suspension: THREE.Group;
   wheels: THREE.Mesh[];
   saw?: THREE.Group;
   hammer?: THREE.Group;
@@ -82,6 +83,8 @@ function robot(
   chassis: Chassis = 'mule',
 ): Robot {
   const group = new THREE.Group(),
+    suspension = new THREE.Group(),
+    runningGear = new THREE.Group(),
     paint = new THREE.MeshStandardMaterial({ color, metalness: 0.58, roughness: 0.65 });
   box(group, 0, 0.62, 0, 1.75, 0.48, 2.35, steel);
   box(group, 0, 0.95, -0.12, 1.62, 0.34, 1.65, paint);
@@ -93,13 +96,14 @@ function robot(
     for (const z of [-0.82, 0.73]) cylinder(group, x, 1.16, z, 0.055, 0.04, silver);
   }
   for (let i = 0; i < 5; i++) box(group, -0.34 + i * 0.17, 1.135, -0.55, 0.075, 0.025, 0.36, dark);
+  group.add(runningGear);
   const wheels: THREE.Mesh[] = [];
   for (const x of [-1, 1])
     for (const z of [-0.78, 0.78]) {
-      const wheel = cylinder(group, x, 0.45, z, 0.46, 0.36, rubber, 'x', 16);
+      const wheel = cylinder(runningGear, x, 0.45, z, 0.46, 0.36, rubber, 'x', 16);
       wheels.push(wheel);
-      cylinder(group, x * 1.19, 0.45, z, 0.25, 0.045, steel, 'x');
-      cylinder(group, x * 1.22, 0.45, z, 0.095, 0.05, paint, 'x');
+      cylinder(runningGear, x * 1.19, 0.45, z, 0.25, 0.045, steel, 'x');
+      cylinder(runningGear, x * 1.22, 0.45, z, 0.095, 0.05, paint, 'x');
       box(group, x, 0.94, z, 0.45, 0.12, 0.95, paint);
     }
   for (const x of [-0.57, 0.57])
@@ -134,9 +138,9 @@ function robot(
     box(group, 0, 1.2, -0.55, 1.35, 0.22, 0.6, steel);
   } else if (chassis === 'bulwark') {
     for (const x of [-1, 1]) {
-      box(group, x, 0.48, 0, 0.4, 0.7, 2.4, rubber);
+      box(runningGear, x, 0.48, 0, 0.4, 0.7, 2.4, rubber);
       box(group, x, 0.93, 0, 0.44, 0.2, 2.5, paint);
-      for (let z = -1; z <= 1; z += 0.25) box(group, x, 0.12, z, 0.42, 0.08, 0.1, silver);
+      for (let z = -1; z <= 1; z += 0.25) box(runningGear, x, 0.12, z, 0.42, 0.08, 0.1, silver);
     }
     box(group, 0, 1.19, -0.52, 1.65, 0.3, 0.92, paint);
     box(group, 0, 0.81, -1.2, 1.8, 0.65, 0.22, steel);
@@ -280,7 +284,11 @@ function robot(
   burn.rotation.x = -Math.PI / 2;
   burn.scale.setScalar(0.65);
   group.add(burn);
+  // Suspension moves the body only; tires, hubs, and tracks stay on the roof.
+  for (const child of [...group.children]) if (child !== runningGear) suspension.add(child);
+  group.add(suspension);
   return {
+    suspension,
     chassis,
     group,
     burn,
@@ -468,11 +476,12 @@ export class GameScene {
       if (![steel, dark, silver, rubber].includes(m as THREE.MeshStandardMaterial)) m.dispose();
   }
   private animateRobot(r: Robot, p: PlayerState | undefined, time: number, dt: number): void {
+    r.group.rotation.x = r.group.rotation.z = 0;
     r.impactAge += dt;
     r.impact *= Math.exp(-dt * 8);
-    r.group.rotation.x = Math.sin(r.impactAge * 32) * r.impact * 0.13;
-    r.group.rotation.z = Math.sin(r.impactAge * 25) * r.impact * 0.08;
-    r.group.position.y -= Math.abs(Math.sin(r.impactAge * 32)) * r.impact * 0.12;
+    r.suspension.rotation.x = Math.sin(r.impactAge * 32) * r.impact * 0.04;
+    r.suspension.rotation.z = Math.sin(r.impactAge * 25) * r.impact * 0.025;
+    r.suspension.position.y = -Math.abs(Math.sin(r.impactAge * 32)) * r.impact * 0.02;
     for (const w of r.wheels) w.rotation.x += (dt * r.speed) / 0.46;
     if (r.saw) r.saw.rotation.y += dt * (p?.frontActive ? 35 : 3);
     if (r.drill) r.drill.rotation.z += dt * (p?.frontActive ? 29 : 2.2);

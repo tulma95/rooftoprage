@@ -42,14 +42,19 @@ export class City {
           z: z * SPACING,
           w: center ? 55 : 37 + (index % 3) * 4,
           d: center ? 55 : 38 + (index % 4) * 3,
-          h: center ? 129.2 : 40 + ((index * 17) % 65),
+          // Nearby towers rise above the arena; lower blocks keep the streets visible below.
+          h: center
+            ? 129.2
+            : Math.max(Math.abs(x), Math.abs(z)) === 1
+              ? 124 + ((index * 11) % 16)
+              : 40 + ((index * 17) % 65),
         });
       }
     const towers = new THREE.InstancedMesh(cube, masonry, buildings.length);
     const windows = new THREE.InstancedMesh(
       cube,
       new THREE.MeshBasicMaterial({ color: '#c3ddd8', transparent: true, opacity: 0.65 }),
-      20000,
+      buildings.reduce((capacity, b) => capacity + Math.ceil(b.h / 4) * 28, 0),
     );
     let windowIndex = 0;
     buildings.forEach((b, i) => {

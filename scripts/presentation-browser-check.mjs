@@ -19,8 +19,8 @@ try {
     const scene = new GameScene(document.querySelector('canvas'));
     const a = makePlayer('a', 'Winner', 'hammer', 'cannon', 0),
       b = makePlayer('b', 'Loser', 'ram', 'cannon', 1);
-    Object.assign(a, { x: 26, z: 0, yaw: Math.PI / 2 });
-    Object.assign(b, { x: 27, z: 4, yaw: Math.PI / 2 });
+    Object.assign(a, { x: 0, z: 0, yaw: Math.PI / 2 });
+    Object.assign(b, { x: 4, z: 4, yaw: Math.PI / 2 });
     const state = {
       code: 'TEST',
       round: 1,
@@ -40,6 +40,35 @@ try {
     scene.update(state, 'a', EMPTY_INPUT);
   });
   await page.waitForTimeout(1200);
+  await page.screenshot({ path: 'artifacts/presentation-center.png' });
+  const grounding = await page.evaluate(async () => {
+    const { scene, state, input } = window.visual;
+    let lowestRoot = Infinity,
+      lowestWheel = Infinity,
+      lowestBody = Infinity;
+    for (let frame = 0; frame < 90; frame++) {
+      const next = structuredClone(state);
+      next.events = [{ id: frame + 1, type: 'hit', playerId: 'a', x: 0, z: 0 }];
+      scene.update(next, 'a', input);
+      await new Promise(requestAnimationFrame);
+      const robot = scene.robots.get('a');
+      lowestRoot = Math.min(lowestRoot, robot.group.position.y);
+      lowestBody = Math.min(lowestBody, robot.suspension.position.y);
+      for (const wheel of robot.wheels)
+        lowestWheel = Math.min(lowestWheel, wheel.getWorldPosition(wheel.position.clone()).y);
+    }
+    return { lowestRoot, lowestWheel, lowestBody };
+  });
+  assert.ok(grounding.lowestRoot >= 0, 'Repeated hits must not lower the robot root');
+  assert.ok(grounding.lowestWheel >= 0.449, 'Wheel centers must remain at their resting height');
+  assert.ok(grounding.lowestBody >= -0.031, 'Suspension compression must stay bounded');
+  await page.evaluate(() => {
+    const { scene, state, input } = window.visual;
+    state.players[0].x = 26;
+    state.players[1].x = 27;
+    scene.update(structuredClone(state), 'a', input);
+  });
+  await page.waitForTimeout(1200);
   await page.screenshot({ path: 'artifacts/presentation-edge.png' });
   await page.evaluate(() => {
     const { scene, state, input } = window.visual;
@@ -49,7 +78,7 @@ try {
     next.phase = 'results';
     next.winnerId = 'a';
     next.events = [
-      { id: 1, type: 'elimination', playerId: 'b', reason: 'fell off the roof', x: 29, z: 0 },
+      { id: 1000, type: 'elimination', playerId: 'b', reason: 'fell off the roof', x: 29, z: 0 },
     ];
     scene.update(next, 'a', input);
   });
@@ -64,7 +93,7 @@ try {
   await page.waitForTimeout(300);
   assert.deepEqual(errors, []);
   console.log(
-    'Edge view, final fall, cinematic expiry, and round reset render without browser errors.',
+    'Center skyline, grounded repeated hits, edge view, final fall, cinematic expiry, and round reset pass without browser errors.',
   );
 } finally {
   await browser.close();

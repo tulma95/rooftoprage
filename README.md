@@ -30,7 +30,7 @@ Checks performed for the presentation changes:
 - `node --import tsx --test tests/finale.test.ts tests/weapon-effects.test.ts` — Cinematic triggers, cleanup, state isolation, and effect pooling.
 - `npm run build` — Production browser and server builds.
 - `npm run format:check` — Repository formatting.
-- `node scripts/presentation-browser-check.mjs` — Edge view, final fall, cinematic expiry, and round reset.
+- `node scripts/presentation-browser-check.mjs` — Center skyline, grounded hits, edge view, final fall, expiry, and round reset.
 - `node scripts/bots-browser-check.mjs` — Solo combat, results, rematch, and leaving.
 - Screenshot inspection — Checked edge framing and the falling robot visually.
 - `git diff --check` and `git status --short` — Whitespace errors and uncommitted changes.
