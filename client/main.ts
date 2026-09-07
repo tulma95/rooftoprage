@@ -1,7 +1,12 @@
+import { screenMarkup, settingsForm, help } from './screens.js';
+import { escape, button, tag } from './html.js';
+import { loadProfile, saveProfile } from './profile.js';
+import { KeyboardInput } from './input.js';
+import { tone } from './sound.js';
 import { sendClientMessage } from '../shared/protocol.js';
-import { onServerMessage } from './messages.js';
+import { ArenaSession, connectionError } from './session.js';
 import { isScreen, type Screen, type Modal } from './navigation.js';
-import { Client, type Room } from '@colyseus/sdk';
+import { type Room } from '@colyseus/sdk';
 import { GameScene } from './scene.js';
 import { SynthwaveMusic } from './music.js';
 import {
@@ -37,26 +42,9 @@ const serverAddress = import.meta.env.DEV
 const endpoint =
   import.meta.env.VITE_SERVER_URL ||
   `${location.protocol === 'https:' ? 'wss' : 'ws'}://${serverAddress}`;
-const client = new Client(endpoint);
-let chassis: Chassis = 'mule';
-let nickname = '',
-  front: FrontWeapon = 'ram',
-  top: TopWeapon = 'cannon';
+
+let { nickname, chassis, front, top, settings } = loadProfile();
 const music = new SynthwaveMusic();
-let settings = { audio: true, music: true, low: false, reduced: false, contrast: false };
-try {
-  const saved = JSON.parse(localStorage.getItem('rooftop-profile') || '{}');
-  if (validName(saved.nickname)) nickname = saved.nickname;
-  if (validEquipment(saved)) {
-    front = saved.front;
-    top = saved.top;
-    chassis = saved.chassis ?? 'mule';
-  }
-  for (const key of Object.keys(settings) as (keyof typeof settings)[])
-    if (typeof saved.settings?.[key] === 'boolean') settings[key] = saved.settings[key];
-} catch {
-  /* Storage is optional. */
-}
 let screen: Screen = nickname ? 'home' : 'name';
 let modal: Modal = '';
 let busy = false,
@@ -71,26 +59,14 @@ let busy = false,
   lastEvent = 0,
   combatMessage = '',
   combatMessageUntil = 0;
-const keys = new Set<string>();
-const input = { ...EMPTY_INPUT };
-const escape = (s: string) =>
-  s.replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
-  );
-const button = (action: string, label: string, cls = '', disabled = false) =>
-  `<button data-action="${action}" class="${cls}" ${disabled ? 'disabled' : ''}>${label}</button>`;
-const weaponIcons: Record<string, string> = WEAPON_ICONS;
-const tag = (text: string) => `<span class="eyebrow">${text}</span>`;
+const controls = new KeyboardInput(playing, () => {
+  modal = modal ? '' : 'menu';
+  renderModal();
+});
+const input = controls.state;
 function save() {
-  try {
-    localStorage.setItem(
-      'rooftop-profile',
-      JSON.stringify({ nickname, chassis, front, top, settings }),
-    );
-  } catch {
+  if (!saveProfile({ nickname, chassis, front, top, settings }))
     error = 'Browser saving is unavailable. You can still play this session.';
-  }
 }
 function applySettings() {
   music.setEnabled(settings.music);
@@ -120,54 +96,6 @@ function navigate(to: Screen) {
   error = '';
   render();
 }
-function equipment() {
-  return `<div class="chassis-picker">${tag('Chassis')}<div class="choices">${Object.entries(
-    CHASSIS,
-  )
-    .map(
-      ([key, c]) =>
-        `<button data-chassis="${key}" aria-pressed="${chassis === key}" class="choice ${chassis === key ? 'selected' : ''}"><strong>${c.name}</strong><small>${c.role}</small><small>${c.hp} HP · ${c.speed} m/s</small></button>`,
-    )
-    .join(
-      '',
-    )}</div><p class="muted">${CHASSIS[chassis].description} Reverse ${CHASSIS[chassis].reverse} m/s · Turn ${CHASSIS[chassis].turn} rad/s</p></div><div class="slots">${(
-    ['front', 'top'] as const
-  )
-    .map(
-      (slot) =>
-        `<div>${tag(`${slot} attachment`)}<div class="choices">${Object.entries(WEAPONS)
-          .filter(([, w]) => w.slot === slot)
-          .map(
-            ([key, w]) =>
-              `<button data-equip="${key}" class="choice ${(slot === 'front' ? front : top) === key ? 'selected' : ''}"><span class="weapon-symbol">${weaponIcons[key]}</span><strong>${w.name}</strong><small>${w.damage}${key === 'scattergun' ? ' × 5' : w.cooldown === 0 ? '/s' : ''} DMG · ${w.range}m</small></button>`,
-          )
-          .join(
-            '',
-          )}</div><p class="muted">${WEAPONS[slot === 'front' ? front : top].description}</p></div>`,
-    )
-    .join('')}</div>`;
-}
-function settingsForm() {
-  return `${tag('Make it yours')}<h2>Settings</h2>${(
-    [
-      ['audio', 'Sound effects'],
-      ['music', 'Synthwave music'],
-      ['low', 'Low graphics / reduced resolution'],
-      ['reduced', 'Reduce motion and effects'],
-      ['contrast', 'High contrast panels'],
-    ] as const
-  )
-    .map(
-      ([key, label]) =>
-        `<label class="setting"><span>${label}</span><input type="checkbox" data-setting="${key}" ${settings[key] ? 'checked' : ''}></label>`,
-    )
-    .join(
-      '',
-    )}<p class="muted">Settings save automatically. The online battle continues while this menu is open.</p>`;
-}
-function help() {
-  return `${tag('Field manual')}<h2>Stay on the roof.</h2><p>Destroy every other robot, or push them over the edge. One life. Five minutes. More than one survivor at timeout means a draw.</p><div class="controls"><p><kbd>W</kbd> <kbd>S</kbd> Forward / reverse</p><p><kbd>A</kbd> <kbd>D</kbd> Turn and aim</p><p><kbd>Space</kbd> Front weapon</p><p><kbd>E</kbd> Top weapon</p><p><kbd>Esc</kbd> Battle menu</p></div><p class="muted">Weapons fire forward. Steer to aim. Hold an activation key to keep firing. Falling is fatal. Eliminated pilots can watch the survivors.</p><p class="muted">Yellow-banded fuel tanks explode and chain together. Flames and tank blasts ignite dark oil slicks; oil reduces steering grip. Fire clings to robots for 3 seconds. Cyan cooling pools slow you down, extinguish fire, and cool the Furnace Jet faster.</p>`;
-}
 function render() {
   const inGame = playing();
   document.body.classList.toggle('in-game', inGame);
@@ -178,23 +106,20 @@ function render() {
     renderModal();
     return;
   }
-  let content = '';
-  if (screen === 'name')
-    content = `${tag('Pilot registration / no account needed')}<h1>WHO’S IN<br>THE DRIVER’S SEAT?</h1><form id="name-form"><label for="nickname">Pilot callsign</label><input id="nickname" name="nickname" maxlength="20" placeholder="Enter a nickname" value="${escape(nickname)}" autocomplete="nickname" required><button class="primary">Enter garage <span>↗</span></button></form><p class="muted">1–20 characters. Your machine is waiting.</p>`;
-  if (screen === 'home')
-    content = `${tag('Multiplayer rooftop combat')}<h1>BUILT TO BRAWL.<br>NOT TO LAST.</h1><p class="lede">Four machines. One rooftop.<br>Leave your manners on the ground floor.</p><div class="actions">${button('play', 'Find a fight <span>↗</span>', 'primary')}${button('practice', 'Play with bots')}${button('garage', 'Customize machine')}${button('help', 'How to play', 'quiet')}</div><div class="spec-strip"><span><b>01–04</b> PILOTS</span><span><b>05:00</b> TO SURVIVE</span><span><b>01</b> LIFE</span></div>`;
-  if (screen === 'garage')
-    content = `${tag('Workshop / choose your chassis')}<h1>YOUR MACHINE.<br>YOUR PROBLEM.</h1><p class="lede">${CHASSIS[chassis].name}. ${CHASSIS[chassis].description}</p>${equipment()}<div class="actions">${button('save-equipment', 'Save loadout', 'primary')}${button(room ? 'lobby' : 'home', 'Back', 'quiet')}</div>`;
-  if (screen === 'play')
-    content = `${tag('Choose your fight')}<h1>TAKE IT<br>TO THE ROOF.</h1><p class="lede">Practice solo against three bots, or create a room and invite friends.</p>${button('practice', busy ? 'Connecting…' : 'Play with bots', '', busy)}${button('create', busy ? 'Connecting…' : 'Create private room', 'primary', busy)}<div class="divider">OR JOIN A CREW</div><form id="join-form"><label for="code">Room code or invite link</label><input id="code" name="code" placeholder="e.g. A1B2C3" value="${escape(new URLSearchParams(location.search).get('room') || '')}" required><button ${busy ? 'disabled' : ''}>${busy ? 'Connecting…' : 'Join room →'}</button></form>${button('home', 'Back', 'quiet')}`;
-  if (screen === 'lobby' && state && room) {
-    const me = local();
-    content = `${tag(state.players.some((p) => p.bot) ? 'Bot practice / staging area' : 'Private room / staging area')}<h1>ASSEMBLE<br>THE CREW.</h1><div class="room-code"><span>${state.players.some((p) => p.bot) ? 'YOU + 3 BOTS' : state.code}</span>${state.players.some((p) => p.bot) ? '' : button('copy', 'Copy invite ↗', 'quiet')}</div><p class="muted">${escape(state.notice || 'Share this code or link. Everyone must be ready before launch.')}</p><div class="roster">${state.players.map((p) => `<div class="pilot"><span class="swatch" style="background:${p.color}"></span><span><strong>${escape(p.name)}${p.bot ? ' · BOT' : ''}${p.id === state!.hostId ? ' · HOST' : ''}${p.id === room!.sessionId ? ' · YOU' : ''}</strong><small>${CHASSIS[p.chassis].name} · ${WEAPONS[p.front].name} / ${WEAPONS[p.top].name}</small></span><b class="${p.ready ? 'ready' : 'muted'}">${p.ready ? 'READY' : 'WAITING'}</b></div>`).join('')}</div><div class="actions">${button('ready', me?.ready ? 'Cancel ready' : 'Ready up', 'primary')}${state.hostId === room.sessionId ? button('start', 'Launch round →', '', state.players.length < 2 || !state.players.every((p) => p.ready)) : '<p class="muted">The host launches the round.</p>'}${button('garage', 'Change loadout', 'quiet')}${button('leave', 'Leave room', 'quiet')}</div>`;
-  }
-  if (screen === 'help') content = `${help()}${button('home', 'Back to home', 'primary')}`;
-  if (screen === 'settings')
-    content = `${settingsForm()}${button('home', 'Done', 'primary')}${button('rename', 'Change nickname', 'quiet')}`;
-  app.innerHTML = `<header><a href="#" data-action="${room ? 'lobby' : 'home'}" class="brand"><span class="brand-icon">R/</span> ROOFTOP<span class="brand-sub">REARMED</span></a><nav>${nickname ? `<span class="pilot-name">${escape(nickname)}</span>${button('settings', 'Settings', 'quiet')}` : ''}<span class="connection ${online ? 'connected' : ''}">${online ? '● SERVER ONLINE' : '○ SERVER OFFLINE'}</span></nav></header><section class="shell ${screen === 'garage' ? 'garage' : ''}"><div class="panel">${error ? `<p class="notice" role="alert">${escape(error)}</p>` : ''}${content}</div><aside class="machine-caption">${tag(`${CHASSIS[chassis].name} / ${CHASSIS[chassis].role}`)}<p>SCRAP-BUILT.<br>BATTLE-READY.</p><span>FRONT / ${WEAPONS[front].name.toUpperCase()}<br>TOP / ${WEAPONS[top].name.toUpperCase()}</span></aside></section><footer><span>INDUSTRIAL VIOLENCE, ELEVATED.</span><span>SECTOR 07 &nbsp; / &nbsp; ROOFTOP ARENA</span></footer>`;
+  app.innerHTML = screenMarkup({
+    screen,
+    nickname,
+    chassis,
+    front,
+    top,
+    settings,
+    state,
+    room,
+    busy,
+    online,
+    error,
+    inviteCode: new URLSearchParams(location.search).get('room') || '',
+  });
 }
 function weaponHud(p: PlayerState, slot: 'front' | 'top', spectator: boolean) {
   const key = p[slot],
@@ -211,7 +136,7 @@ function weaponHud(p: PlayerState, slot: 'front' | 'top', spectator: boolean) {
           ? 'COOLING DOWN'
           : 'READY';
   const progress = heat ? p.heat : cooldown / (w.cooldown || 1);
-  return `<div class="weapon-hud">${tag(slot)}<strong><span aria-hidden="true">${weaponIcons[key]}</span>${w.name} ${spectator ? '' : `<kbd>${slot === 'front' ? 'Space' : 'E'}</kbd>`}</strong><small>${status}</small><div class="meter"><i style="width:${Math.min(100, progress * 100)}%"></i></div></div>`;
+  return `<div class="weapon-hud">${tag(slot)}<strong><span aria-hidden="true">${WEAPON_ICONS[key]}</span>${w.name} ${spectator ? '' : `<kbd>${slot === 'front' ? 'Space' : 'E'}</kbd>`}</strong><small>${status}</small><div class="meter"><i style="width:${Math.min(100, progress * 100)}%"></i></div></div>`;
 }
 function renderHud() {
   const hud = document.querySelector('#hud');
@@ -257,127 +182,92 @@ function renderModal() {
   const overlay = document.querySelector('#overlay');
   if (!overlay) return;
   overlay.innerHTML = modal
-    ? `<div class="modal-backdrop"><section class="modal glass">${modal === 'leave' ? `<h2>Leave this round?</h2><p>Your robot will be eliminated. You cannot rejoin this round.</p>${button('confirm-leave', 'Leave match', 'primary')}${button('resume', 'Keep playing')}` : `${settingsForm()}${button('resume', 'Resume', 'primary')}${button('help-modal', 'Controls')}${button('leave', 'Leave match')}${modal === 'help' ? help() : ''}`}</section></div>`
+    ? `<div class="modal-backdrop"><section class="modal glass">${modal === 'leave' ? `<h2>Leave this round?</h2><p>Your robot will be eliminated. You cannot rejoin this round.</p>${button('confirm-leave', 'Leave match', 'primary')}${button('resume', 'Keep playing')}` : `${settingsForm(settings)}${button('resume', 'Resume', 'primary')}${button('help-modal', 'Controls')}${button('leave', 'Leave match')}${modal === 'help' ? help() : ''}`}</section></div>`
     : '';
 }
-let audio: AudioContext | null = null;
-function tone(hit: boolean) {
-  if (!settings.audio) return;
-  try {
-    audio ??= new AudioContext();
-    void audio.resume();
-    const osc = audio.createOscillator(),
-      gain = audio.createGain();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(hit ? 110 : 240, audio.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(45, audio.currentTime + 0.09);
-    gain.gain.setValueAtTime(0.035, audio.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.12);
-    osc.connect(gain).connect(audio.destination);
-    osc.start();
-    osc.stop(audio.currentTime + 0.13);
-  } catch {
-    /* Audio is optional. */
-  }
-}
-async function connect(code?: string, practice = false) {
-  if (busy) return;
-  busy = true;
-  error = '';
-  render();
-  try {
-    const options = { name: nickname, chassis, front, top, practice };
-    const joined = code
-      ? await client.joinById(code, options)
-      : await client.create('arena', options);
-    joined.reconnection.enabled = false;
+const session = new ArenaSession(endpoint, {
+  joined(joined) {
     room = joined;
     lastPhase = '';
     lastEvent = 0;
     state = null;
-    onServerMessage(joined, 'snapshot', (s: RoomState) => {
-      if (room !== joined) return;
-      state = s;
-      lastSnapshot = performance.now();
-      online = true;
-      for (const e of s.events)
-        if (e.id > lastEvent) {
-          lastEvent = e.id;
-          const victim = s.players.find((p) => p.id === e.playerId),
-            attacker = s.players.find((p) => p.id === e.attackerId);
-          if (e.type === 'elimination') {
-            combatMessage = `${victim?.name ?? 'Robot'} ${e.reason}${attacker ? ` · ${attacker.name}` : ''}`;
-            combatMessageUntil = performance.now() + 3500;
-          } else if (
-            e.type === 'hit' &&
-            (e.playerId === joined.sessionId || e.attackerId === joined.sessionId)
-          ) {
-            if (performance.now() > combatMessageUntil) {
-              combatMessage = e.playerId === joined.sessionId ? 'Armor hit!' : 'Hit confirmed';
-              combatMessageUntil = performance.now() + 550;
-            }
-            tone(true);
-          } else if (e.type === 'shot' && e.playerId === joined.sessionId) tone(false);
-        }
-      scene.update(s, joined.sessionId, input, watched()?.id);
-      if (s.phase !== lastPhase) {
-        lastPhase = s.phase;
-        screen = s.phase === 'lobby' ? 'lobby' : screen;
-        modal = '';
-        render();
-        if (s.phase === 'loading') requestAnimationFrame(() => sendClientMessage(joined, 'loaded'));
-      } else if (s.phase === 'lobby' && screen === 'lobby') {
-        const signature = JSON.stringify([s.players, s.hostId, s.notice]);
-        if (signature !== lobbySignature) {
-          lobbySignature = signature;
-          render();
-        }
-      } else renderHud();
-    });
-    onServerMessage(joined, 'notice', (message: string) => {
-      error = message;
-      render();
-    });
-    joined.onError((_code, message) => {
-      error = message || 'Connection error.';
-      render();
-    });
-    joined.onLeave(() => {
-      if (room !== joined) return;
-      room = null;
-      state = null;
-      keys.clear();
-      screen = 'play';
-      error =
-        'Connection lost. Your robot cannot rejoin the ongoing round. Create or join another room.';
-      scene.update(null, '', EMPTY_INPUT);
-      render();
-    });
-    sendClientMessage(joined, 'sync');
     screen = 'lobby';
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    error = /not found|invalid room/i.test(message)
-      ? 'Room not found. Check the code or ask for a new invite.'
-      : /locked|full|seat/i.test(message)
-        ? 'This room is full or its round has already started. Ask the host to invite you after the round.'
-        : `Could not connect: ${message}. Check that the multiplayer server is running.`;
+  },
+  snapshot(s, joined) {
+    state = s;
+    lastSnapshot = performance.now();
+    online = true;
+    for (const e of s.events)
+      if (e.id > lastEvent) {
+        lastEvent = e.id;
+        const victim = s.players.find((p) => p.id === e.playerId),
+          attacker = s.players.find((p) => p.id === e.attackerId);
+        if (e.type === 'elimination') {
+          combatMessage = `${victim?.name ?? 'Robot'} ${e.reason}${attacker ? ` · ${attacker.name}` : ''}`;
+          combatMessageUntil = performance.now() + 3500;
+        } else if (
+          e.type === 'hit' &&
+          (e.playerId === joined.sessionId || e.attackerId === joined.sessionId)
+        ) {
+          if (performance.now() > combatMessageUntil) {
+            combatMessage = e.playerId === joined.sessionId ? 'Armor hit!' : 'Hit confirmed';
+            combatMessageUntil = performance.now() + 550;
+          }
+          tone(true, settings.audio);
+        } else if (e.type === 'shot' && e.playerId === joined.sessionId)
+          tone(false, settings.audio);
+      }
+    scene.update(s, joined.sessionId, input, watched()?.id);
+    if (s.phase !== lastPhase) {
+      lastPhase = s.phase;
+      screen = s.phase === 'lobby' ? 'lobby' : screen;
+      modal = '';
+      render();
+      if (s.phase === 'loading') requestAnimationFrame(() => sendClientMessage(joined, 'loaded'));
+    } else if (s.phase === 'lobby' && screen === 'lobby') {
+      const signature = JSON.stringify([s.players, s.hostId, s.notice]);
+      if (signature !== lobbySignature) {
+        lobbySignature = signature;
+        render();
+      }
+    } else renderHud();
+  },
+  notice(message) {
+    error = message;
+    render();
+  },
+  disconnected() {
+    room = null;
+    state = null;
+    controls.clear();
+    screen = 'play';
+    error =
+      'Connection lost. Your robot cannot rejoin the ongoing round. Create or join another room.';
+    scene.update(null, '', EMPTY_INPUT);
+    render();
+  },
+});
+async function connect(code?: string, practice = false) {
+  if (busy || room) return;
+  busy = true;
+  error = '';
+  render();
+  try {
+    await session.connect({ nickname, chassis, front, top }, code, practice);
+  } catch (cause) {
+    error = connectionError(cause);
   } finally {
     busy = false;
     render();
   }
 }
 async function leave(to: Screen = 'play') {
-  const previous = room;
   room = null;
   state = null;
   modal = '';
-  keys.clear();
+  controls.clear();
   scene.update(null, '', EMPTY_INPUT);
-  if (previous)
-    try {
-      await previous.leave();
-    } catch {}
+  await session.leave();
   navigate(to);
 }
 app.addEventListener('submit', (e) => {
@@ -470,14 +360,14 @@ app.addEventListener('click', async (e) => {
   if (action === 'leave') {
     if (playing() && state?.phase !== 'results') {
       modal = 'leave';
-      keys.clear();
+      controls.clear();
       renderModal();
     } else await leave();
   }
   if (action === 'confirm-leave') await leave();
   if (action === 'menu') {
     modal = 'menu';
-    keys.clear();
+    controls.clear();
     renderModal();
   }
   if (action === 'resume') {
@@ -494,28 +384,8 @@ app.addEventListener('click', async (e) => {
       alive[(alive.findIndex((p) => p.id === watched()?.id) + 1) % alive.length]?.id || '';
   }
 });
-window.addEventListener('keydown', (e) => {
-  if ((e.target as HTMLElement).matches('input,textarea')) return;
-  if (playing() && ['KeyW', 'KeyS', 'KeyA', 'KeyD', 'Space', 'KeyE', 'Escape'].includes(e.code)) {
-    e.preventDefault();
-    if (e.code === 'Escape' && !e.repeat) {
-      modal = modal ? '' : 'menu';
-      keys.clear();
-      renderModal();
-    } else keys.add(e.code);
-  }
-});
-window.addEventListener('keyup', (e) => keys.delete(e.code));
-window.addEventListener('blur', () => keys.clear());
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) keys.clear();
-});
 setInterval(() => {
-  const enabled = state?.phase === 'combat' && local()?.alive && !modal && !document.hidden;
-  input.forward = enabled ? Number(keys.has('KeyW')) - Number(keys.has('KeyS')) : 0;
-  input.turn = enabled ? Number(keys.has('KeyA')) - Number(keys.has('KeyD')) : 0;
-  input.front = !!enabled && keys.has('Space');
-  input.top = !!enabled && keys.has('KeyE');
+  controls.sample(state?.phase === 'combat' && !!local()?.alive && !modal);
   if (room && state?.phase === 'combat') sendClientMessage(room, 'input', input);
   scene.update(state, room?.sessionId || '', input, watched()?.id);
   if (playing() && performance.now() - lastSnapshot > 1500) renderHud();
@@ -534,14 +404,7 @@ function aimLoop() {
 }
 aimLoop();
 async function health() {
-  try {
-    const response = await fetch(`${endpoint.replace(/^ws/, 'http').replace(/\/$/, '')}/health`, {
-      signal: AbortSignal.timeout(2500),
-    });
-    online = response.ok;
-  } catch {
-    online = false;
-  }
+  online = await session.healthy();
   if (!room && !busy) {
     const badge = document.querySelector('.connection');
     if (badge) {
