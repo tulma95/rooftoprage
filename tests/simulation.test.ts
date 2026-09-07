@@ -71,3 +71,23 @@ test('roof falls decide winner; timeout with survivors is a draw', () => {
   const timed = match(); timed.state.remaining = .01; timed.step(.05);
   assert.equal(timed.state.phase, 'results'); assert.equal(timed.state.remaining, 0); assert.equal(timed.state.draw, true);
 });
+
+
+test('later zero-damage attacks cannot steal a lethal hit in the same tick', () => {
+  for (const flame of [false, true]) {
+    const sim = match();
+    const [a, b] = sim.state.players;
+    const c = makePlayer('c', 'Late attacker', 'saw', 'flamethrower', 2);
+    sim.state.players.push(c);
+    Object.assign(a!, { x: 0, z: 0, yaw: 0, front: 'saw' });
+    Object.assign(b!, { x: 0, z: 2.5, hp: 1 });
+    Object.assign(c, { x: 0, z: flame ? 8 : 5, yaw: Math.PI });
+    input(sim, 'a', { front: true });
+    input(sim, 'c', flame ? { top: true } : { front: true });
+    sim.step(.05);
+    assert.equal(a!.stats.kills, 1);
+    assert.equal(c.stats.damage, 0);
+    assert.equal(c.stats.kills, 0);
+    assert.equal(sim.state.events.filter(e => e.type === 'hit' && e.playerId === 'b').length, 1);
+  }
+});

@@ -18,10 +18,6 @@ export class Simulation {
     p.alive = false; p.hp = 0; p.frontActive = p.topActive = false; this.inputs.delete(p.id); this.event('elimination', p, attackerId, reason);
     const attacker = this.state.players.find(a => a.id === attackerId); if (attacker && attacker !== p) attacker.stats.kills++;
   }
-  damage(p: PlayerState, amount: number, attacker: PlayerState) {
-    if (!p.alive) return;
-    if (attacker !== p) attacker.stats.damage += Math.min(p.hp, amount); p.hp = Math.max(0, p.hp - amount); this.event('hit', p, attacker.id);
-  }
   finishIfNeeded() {
     const s = this.state; const alive = s.players.filter(p => p.alive);
     if (s.phase === 'combat' && (alive.length <= 1 || s.remaining <= 0)) { s.phase = 'results'; s.draw = alive.length !== 1; s.winnerId = s.draw ? null : alive[0]!.id; this.inputs.clear(); }
@@ -31,10 +27,13 @@ export class Simulation {
     s.remaining = Math.max(0, s.remaining - dt);
     const active = s.players.filter(p => p.alive); const lastAttacker = new Map<string, string>();
     const hurt = (p: PlayerState, amount: number, attackerId?: string) => {
-      if (p.hp <= 0) return;
+      if (!p.alive || p.hp <= 0 || amount <= 0) return;
       const attacker = s.players.find(a => a.id === attackerId);
-      if (attacker) this.damage(p, amount, attacker); else { p.hp = Math.max(0, p.hp - amount); this.event('hit', p); }
+      if (attacker && attacker !== p) attacker.stats.damage += Math.min(p.hp, amount);
+      p.hp = Math.max(0, p.hp - amount);
+      this.event('hit', p, attackerId);
       if (attackerId) lastAttacker.set(p.id, attackerId);
+      else lastAttacker.delete(p.id);
     };
     const explode = (tank: typeof s.tanks[number], attackerId?: string) => {
       if (tank.hp <= 0) return;
@@ -86,10 +85,10 @@ export class Simulation {
       if (a === b) continue; const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz); const aim = (dx * Math.sin(a.yaw) + dz * Math.cos(a.yaw)) / Math.max(.001, d);
       const frontRules = FRONT_RULES[a.front];
       if (a.frontActive && d <= WEAPONS[a.front].range && aim > frontRules.aim) {
-        this.damage(b, WEAPONS[a.front].damage * (frontRules.continuous ? dt : 1), a); lastAttacker.set(b.id, a.id);
+        hurt(b, WEAPONS[a.front].damage * (frontRules.continuous ? dt : 1), a.id);
         b.x += Math.sin(a.yaw) * frontRules.push; b.z += Math.cos(a.yaw) * frontRules.push;
       }
-      if (a.topActive && a.top === 'flamethrower' && d < WEAPONS.flamethrower.range && aim > .82) { this.damage(b, WEAPONS.flamethrower.damage * dt, a); lastAttacker.set(b.id, a.id); }
+      if (a.topActive && a.top === 'flamethrower' && d < WEAPONS.flamethrower.range && aim > .82) { hurt(b, WEAPONS.flamethrower.damage * dt, a.id); }
     }
     s.projectiles = s.projectiles.filter(q => {
       const rule = PROJECTILE_RULES[q.weapon], weapon = WEAPONS[q.weapon];
