@@ -1,5 +1,6 @@
+import { BattleHud } from './hud.js';
 import { screenMarkup, settingsForm, help } from './screens.js';
-import { escape, button, tag } from './html.js';
+import { button } from './html.js';
 import { loadProfile, saveProfile } from './profile.js';
 import { KeyboardInput } from './input.js';
 import { tone } from './sound.js';
@@ -10,23 +11,17 @@ import { type Room } from '@colyseus/sdk';
 import { GameScene } from './scene.js';
 import { SynthwaveMusic } from './music.js';
 import {
-  CHASSIS,
   isChassis,
-  type Chassis,
   EMPTY_INPUT,
-  WEAPONS,
-  WEAPON_ICONS,
   isFrontWeapon,
   isTopWeapon,
   validName,
-  validEquipment,
-  type FrontWeapon,
-  type TopWeapon,
   type RoomState,
   type PlayerState,
 } from '../shared/game.js';
 import './style.css';
 const app = document.querySelector<HTMLElement>('#app')!;
+let hud: BattleHud | null = null;
 const canvas = document.querySelector<HTMLCanvasElement>('#world')!;
 let scene: GameScene;
 try {
@@ -101,11 +96,15 @@ function render() {
   document.body.classList.toggle('in-game', inGame);
   scene.preview(front, top, chassis);
   if (inGame) {
-    app.innerHTML = `<div id="hud"></div><div id="overlay"></div>`;
+    if (!hud || !hud.element.isConnected) {
+      app.innerHTML = `<div id="hud"></div><div id="overlay"></div>`;
+      hud = new BattleHud(document.querySelector<HTMLElement>('#hud')!);
+    }
     renderHud();
     renderModal();
     return;
   }
+  hud = null;
   app.innerHTML = screenMarkup({
     screen,
     nickname,
@@ -121,62 +120,15 @@ function render() {
     inviteCode: new URLSearchParams(location.search).get('room') || '',
   });
 }
-function weaponHud(p: PlayerState, slot: 'front' | 'top', spectator: boolean) {
-  const key = p[slot],
-    w = WEAPONS[key],
-    cooldown = slot === 'front' ? p.frontCooldown : p.topCooldown,
-    active = slot === 'front' ? p.frontActive : p.topActive;
-  const heat = slot === 'top' && key === 'flamethrower';
-  const status =
-    heat && p.overheated
-      ? 'OVERHEATED'
-      : active
-        ? 'ACTIVE'
-        : cooldown > 0
-          ? 'COOLING DOWN'
-          : 'READY';
-  const progress = heat ? p.heat : cooldown / (w.cooldown || 1);
-  return `<div class="weapon-hud">${tag(slot)}<strong><span aria-hidden="true">${WEAPON_ICONS[key]}</span>${w.name} ${spectator ? '' : `<kbd>${slot === 'front' ? 'Space' : 'E'}</kbd>`}</strong><small>${status}</small><div class="meter"><i style="width:${Math.min(100, progress * 100)}%"></i></div></div>`;
-}
 function renderHud() {
-  const hud = document.querySelector('#hud');
   if (!hud || !state || !room) return;
-  const s = state,
-    p = watched(),
-    me = local(),
-    spectator = !me?.alive;
-  const alive = s.players.filter((p) => p.alive).length;
-  const seconds = Math.ceil(s.remaining);
-  const unstable = performance.now() - lastSnapshot > 1500;
-  const markup = `<div class="hud-roster glass">${s.players.map((p) => `<div><span class="swatch" style="background:${p.color}"></span><span>${escape(p.name)}</span><small>${p.alive ? 'ALIVE' : 'OUT'}</small></div>`).join('')}</div><div class="hud-timer glass"><strong>${s.phase === 'loading' ? 'LOADING' : s.phase === 'countdown' ? Math.ceil(s.countdown) : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`}</strong><span>${alive} of ${s.players.length} remaining</span></div><div class="hud-menu">${button('menu', 'Menu / Esc')}<span class="connection ${unstable ? '' : 'connected'}">${unstable ? '⚠ CONNECTION UNSTABLE' : '● CONNECTED'}</span></div>${p ? `<div class="hud-health glass ${p.hp < CHASSIS[p.chassis].hp * 0.3 ? 'low-health' : ''}">${tag(spectator ? `Spectating / ${escape(p.name)}` : escape(p.name))}<strong>${Math.ceil(p.hp)} <small>/ ${CHASSIS[p.chassis].hp} HP</small></strong><div class="meter"><i style="width:${(p.hp / CHASSIS[p.chassis].hp) * 100}%"></i></div></div><div class="hud-weapons">${weaponHud(p, 'front', spectator)}${weaponHud(p, 'top', spectator)}</div>` : ''}${spectator && s.phase === 'combat' ? `<div class="spectator glass"><b>ELIMINATED · SPECTATING</b>${button('spectate', 'Next survivor →')}${button('leave', 'Leave match', 'quiet')}</div>` : ''}${!spectator && s.phase === 'combat' ? '<span id="aim" aria-hidden="true">⊹</span>' : ''}<p class="combat-message" aria-live="polite">${performance.now() < combatMessageUntil ? escape(combatMessage) : ''}</p>${s.phase === 'loading' ? `<div class="center-card glass"><h2>Preparing the rooftop</h2>${s.players.map((p) => `<p>${escape(p.name)} · ${p.loaded ? 'LOADED' : 'LOADING'}</p>`).join('')}</div>` : ''}${s.phase === 'countdown' ? '<div class="countdown-label">ENGINES ON. STAY ON THE ROOF.</div>' : ''}${s.phase === 'results' ? `<section class="results glass">${tag(`Round ${s.round} complete`)}<h1>${s.draw ? 'DRAW' : s.winnerId === room.sessionId ? 'VICTORY' : 'ELIMINATED'}</h1><p>${s.draw ? 'No single survivor. The roof wins.' : `${escape(s.players.find((p) => p.id === s.winnerId)?.name || 'Unknown pilot')} is the last robot standing.`}</p><table><thead><tr><th>Pilot</th><th>Damage</th><th>KOs</th><th>Shots</th></tr></thead><tbody>${s.players.map((p) => `<tr><td>${escape(p.name)}</td><td>${Math.round(p.stats.damage)}</td><td>${p.stats.kills}</td><td>${p.stats.shots}</td></tr>`).join('')}</tbody></table><div class="actions">${button('again', 'Play again', 'primary')}${button('results-garage', 'Return to garage')}</div></section>` : ''}`;
-  const template = document.createElement('template');
-  template.innerHTML = markup;
-  patchChildren(hud, template.content);
-}
-function patchChildren(parent: Node, incoming: Node): void {
-  const children = Array.from(incoming.childNodes);
-  children.forEach((next, index) => {
-    const current = parent.childNodes[index];
-    if (!current) {
-      parent.appendChild(next.cloneNode(true));
-      return;
-    }
-    if (current.nodeType !== next.nodeType || current.nodeName !== next.nodeName) {
-      parent.replaceChild(next.cloneNode(true), current);
-      return;
-    }
-    if (current.isEqualNode(next)) return;
-    if (current instanceof Element && next instanceof Element) {
-      for (const attr of Array.from(current.attributes))
-        if (!next.hasAttribute(attr.name) && !(current.id === 'aim' && attr.name === 'style'))
-          current.removeAttribute(attr.name);
-      for (const attr of Array.from(next.attributes))
-        if (current.getAttribute(attr.name) !== attr.value)
-          current.setAttribute(attr.name, attr.value);
-      patchChildren(current, next);
-    } else current.nodeValue = next.nodeValue;
+  hud.update({
+    state,
+    sessionId: room.sessionId,
+    watched: watched(),
+    unstable: performance.now() - lastSnapshot > 1500,
+    message: performance.now() < combatMessageUntil ? combatMessage : '',
   });
-  while (parent.childNodes.length > children.length) parent.removeChild(parent.lastChild!);
 }
 function renderModal() {
   const overlay = document.querySelector('#overlay');

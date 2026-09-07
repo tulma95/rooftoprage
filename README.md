@@ -80,6 +80,7 @@ For another computer on the same network, open `http://<host-LAN-IP>:5173` using
 ## Build, checks, and hosting
 
 ```bash
+npm run format:check
 npm run typecheck
 npm test
 npm run build
@@ -95,7 +96,7 @@ One Node process owns its rooms in memory. A restart loses rooms and ends matche
 ## Code and assets
 
 - `client/`: TypeScript browser interface, Three.js renderer, procedural models, effects, audio, and input. Three.js provides lightweight editable meshes, lighting, and a follow camera without an external modeling pipeline.
-- `server/`: Colyseus private rooms and authoritative movement, collision, combat, eliminations, and round rules. The simulation runs at 20 Hz and broadcasts confirmed snapshots; clients send controls rather than positions or damage.
+- `server/`: `index.ts` starts hosting; `arena-room.ts` handles validated room messages; `simulation.ts` owns round transitions and combat. Colyseus private rooms and authoritative movement, collision, combat, eliminations, and round rules. The simulation runs at 20 Hz and broadcasts confirmed snapshots; clients send controls rather than positions or damage.
 - `shared/`: equipment definitions, message/state types, validators, and reusable movement rules shared by both sides.
 - `tests/`: automated rule and room checks.
 - `scripts/`: reproducible setup, foreground local startup, and browser regression checks.
@@ -107,10 +108,15 @@ Typography uses Barlow Condensed and IBM Plex Sans, served by Google Fonts under
 
 ## Verification and limitations
 
-All 30 automated game-rule, bot, rendering-resource, and multiplayer room tests pass, along with strict TypeScript checks and the production build. Startup was checked through `scripts/start-local.sh` from another working directory with alternate ports: both HTTP endpoints responded, occupied server and client ports produced clear errors, Ctrl+C exited cleanly and released both ports, and a child startup failure stopped the other service. Missing dependency handling and Bash/Node script syntax were also checked.
+All 43 automated game-rule, bot, rendering-resource, and multiplayer room tests pass, along with strict TypeScript checks and the production build. Startup was checked through `scripts/start-local.sh` from another working directory with alternate ports: both HTTP endpoints responded, occupied server and client ports produced clear errors, Ctrl+C exited cleanly and released both ports, and a child startup failure stopped the other service. Missing dependency handling and Bash/Node script syntax were also checked.
 
 Automated browser playthroughs cover two-, three-, and four-browser matches, loadouts, ready/countdown, menu settings, roof falls, results, rematches, spectator switching, host departure, invalid codes, text-only names, and blocked-storage room creation. Screenshots were inspected at 1440×900 and 1024×768. The repeatable browser check uses installed Google Chrome: start the game with `./scripts/start-local.sh`, then run `npm run test:browser` in another terminal. Set `BROWSER_URL` if the browser port is overridden. It captures screenshots in `artifacts/`. Human balancing of 2-, 3-, and 4-player matches still requires playtesting. The first version targets desktop keyboard play; mobile/touch controls, moving hazards, upgrades, and progression are outside scope. Server authority prevents trusting client damage or positions, but this prototype is not a production abuse-prevention service.
 
 The new-weapon browser regression is `node scripts/weapons-browser-check.mjs` with the local game running. It checks all four additions, saved loadouts, synchronized lobby choices, firing, combat damage, and weapon HUD states.
 
 The solo-practice browser regression is `node scripts/bots-browser-check.mjs`. It checks a single browser entering a room with three bots, combat through results, rematching, and leaving.
+
+Source formatting is maintained with `npm run format` and checked with `npm run format:check`.
+The client separates session transport (`session.ts`), screen markup (`screens.ts`), persistent battle HUD (`hud.ts`), keyboard input (`input.ts`), and saved preferences (`profile.ts`). Message senders and server validators use the shared payload contracts in `shared/protocol.ts`.
+
+With the local game running, `node scripts/hud-browser-check.mjs` verifies that snapshot updates preserve HUD controls, keyboard focus, and the aim indicator while handling spectator and results transitions. Set `BROWSER_URL` for an alternate browser port.
