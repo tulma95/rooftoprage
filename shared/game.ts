@@ -37,7 +37,7 @@ export interface Input { forward: number; turn: number; front: boolean; top: boo
 export const EMPTY_INPUT: Input = { forward: 0, turn: 0, front: false, top: false };
 export interface PlayerState {
   id: string; name: string; color: string; front: FrontWeapon; top: TopWeapon;
-  ready: boolean; loaded: boolean; connected: boolean; x: number; z: number; yaw: number;
+  bot?: boolean; ready: boolean; loaded: boolean; connected: boolean; x: number; z: number; yaw: number;
   hp: number; alive: boolean; frontCooldown: number; topCooldown: number; heat: number;
   overheated: boolean; frontActive: boolean; topActive: boolean;
   stats: { damage: number; kills: number; shots: number };

@@ -1,4 +1,5 @@
 import { ARENA_HALF, ROBOT_RADIUS, ROUND_SECONDS, WEAPONS, FRONT_RULES, PROJECTILE_RULES, EMPTY_INPUT, drive, type Input, type PlayerState, type RoomState } from '../shared/game.js';
+import { botInput } from './bots.js';
 export class Simulation {
   state: RoomState = { code: '', hostId: '', phase: 'lobby', players: [], projectiles: [], events: [], winnerId: null, draw: false, remaining: ROUND_SECONDS, countdown: 3, notice: '', round: 0 };
   inputs = new Map<string, { input: Input; time: number }>();
@@ -9,7 +10,7 @@ export class Simulation {
   }
   start() {
     const s = this.state; s.round++; s.remaining = ROUND_SECONDS; s.winnerId = null; s.draw = false; s.events = []; s.projectiles = []; s.countdown = 3; this.inputs.clear();
-    s.players.forEach((p, i) => { const a = i * Math.PI * 2 / s.players.length; Object.assign(p, { x: Math.sin(a) * 12, z: Math.cos(a) * 12, yaw: a + Math.PI, hp: 100, alive: true, loaded: false, frontCooldown: 0, topCooldown: 0, heat: 0, overheated: false, frontActive: false, topActive: false, stats: { damage: 0, kills: 0, shots: 0 } }); });
+    s.players.forEach((p, i) => { const a = i * Math.PI * 2 / s.players.length; Object.assign(p, { x: Math.sin(a) * 12, z: Math.cos(a) * 12, yaw: a + Math.PI, hp: 100, alive: true, loaded: !!p.bot, frontCooldown: 0, topCooldown: 0, heat: 0, overheated: false, frontActive: false, topActive: false, stats: { damage: 0, kills: 0, shots: 0 } }); });
   }
   eliminate(p: PlayerState, reason: string, attackerId?: string) {
     if (!p.alive) return;
@@ -29,7 +30,7 @@ export class Simulation {
     s.remaining = Math.max(0, s.remaining - dt);
     const active = s.players.filter(p => p.alive); const lastAttacker = new Map<string, string>();
     for (const p of active) {
-      const stored = this.inputs.get(p.id); const input = stored && this.time - stored.time < .3 ? stored.input : EMPTY_INPUT;
+      const stored = this.inputs.get(p.id); const input = p.bot ? botInput(p, active) : stored && this.time - stored.time < .3 ? stored.input : EMPTY_INPUT;
       drive(p, input, dt); p.frontCooldown = Math.max(0, p.frontCooldown - dt); p.topCooldown = Math.max(0, p.topCooldown - dt);
       p.frontActive = input.front && p.frontCooldown === 0; p.topActive = input.top && p.topCooldown === 0 && !p.overheated;
       if (p.top === 'flamethrower') { p.heat = Math.max(0, Math.min(1, p.heat + (p.topActive ? dt / 3 : -dt / 4))); if (p.heat >= 1) p.overheated = true; if (p.heat === 0) p.overheated = false; }

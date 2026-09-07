@@ -72,7 +72,7 @@ function start(label, args) {
 }
 console.log(`[startup] Browser: http://localhost:${clientPort}`);
 console.log(`[startup] Multiplayer server: port ${serverPort}`);
-console.log('[startup] Open the browser URL in separate tabs/windows, then share the lobby code.');
+console.log('[startup] Choose Play with bots for solo practice, or share a room code with friends.');
 console.log(`[startup] Other computers: use http://<this-computer-LAN-IP>:${clientPort} (allow both ports through your firewall).`);
 console.log('[startup] Running in foreground. Ctrl+C stops both services.');
 start('server', ['run', 'dev:server']);

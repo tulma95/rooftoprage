@@ -152,3 +152,21 @@ test('loading timeout returns the room to lobby with an explanation', async () =
   await until(() => state(host).phase === 'lobby', 23000); assert.match(state(host).notice, /timed out/);
   assert.ok(state(host).players.every(p => !p.ready)); await leave(host); await leave(guest);
 });
+
+test('one human can launch bot practice; bots load, fight, and do not keep an empty room alive', async () => {
+  const host = observe(await new Client(endpoint).create('arena', { ...options, practice: true }));
+  await until(() => state(host)?.players.length === 4);
+  assert.equal(state(host).hostId, host.sessionId);
+  const bots = state(host).players.filter(p => p.bot);
+  assert.equal(bots.length, 3); assert.ok(bots.every(p => p.ready));
+  assert.equal(new Set(state(host).players.map(p => p.color)).size, 4);
+  await assert.rejects(new Client(endpoint).joinById(host.roomId, options));
+  host.send('ready', true);
+  await until(() => state(host).players.every(p => p.ready));
+  host.send('start'); await until(() => state(host).phase === 'loading');
+  assert.ok(state(host).players.filter(p => p.bot).every(p => p.loaded));
+  host.send('loaded'); await until(() => state(host).phase === 'combat');
+  await until(() => state(host).players.some(p => p.bot && p.stats.shots > 0));
+  await leave(host); await delay(150);
+  await assert.rejects(new Client(endpoint).joinById(host.roomId, options));
+});

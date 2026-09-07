@@ -1,8 +1,8 @@
 import * as THREE from 'three';
+import { WeaponEffects } from './weapon-effects.js';
 import { drive, WEAPONS, type FrontWeapon, type TopWeapon, type RoomState, type Input, type PlayerState } from '../shared/game.js';
 
 interface Robot { group: THREE.Group; wheels: THREE.Mesh[]; saw?: THREE.Group; hammer?: THREE.Group; drill?: THREE.Group; barrel: THREE.Group; flame: THREE.Group; front: FrontWeapon; top: TopWeapon; speed: number }
-interface Spark { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number; max: number }
 const steel = new THREE.MeshStandardMaterial({ color: '#3c4444', roughness: .78, metalness: .7 });
 const dark = new THREE.MeshStandardMaterial({ color: '#171d1c', roughness: .85, metalness: .4 });
 const silver = new THREE.MeshStandardMaterial({ color: '#899593', roughness: .5, metalness: .85 });
@@ -70,13 +70,15 @@ export class GameScene {
   private scene=new THREE.Scene(); private camera=new THREE.PerspectiveCamera(48,1,.1,240); private renderer:THREE.WebGLRenderer;
   private robots=new Map<string,Robot>();private previewRobot:Robot;private state:RoomState|null=null;private localId='';private spectatorId='';
   private input:Input={forward:0,turn:0,front:false,top:false};private lastSnapshot=0;private priorState:RoomState|null=null;private clock=new THREE.Clock();private reduced=false;
-  private sparks:Spark[]=[];private seenEvents=new Set<number>();private projectileMeshes=new Map<number,THREE.Mesh>();private target=new THREE.Vector3();private aim:THREE.Vector3|null=null;
+  private effects:WeaponEffects;private seenEvents=new Set<number>();private target=new THREE.Vector3();private aim:THREE.Vector3|null=null;
   constructor(private canvas:HTMLCanvasElement) {
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.3;
     this.scene.background=new THREE.Color('#141f22');this.scene.fog=new THREE.FogExp2('#263536',.011);
     this.scene.add(new THREE.HemisphereLight('#c9e0d8','#43362a',2.5));const sun=new THREE.DirectionalLight('#ffdb9c',3.1);sun.position.set(-16,35,12);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-32,right:32,top:32,bottom:-32,near:1,far:90});sun.shadow.bias=-.0006;this.scene.add(sun);
-    this.buildArena();this.previewRobot=robot('ram','cannon','#e6aa3c');this.scene.add(this.previewRobot.group);this.camera.position.set(7,5,8);this.target.set(0,.6,0);
+    this.effects=new WeaponEffects(this.scene);this.buildArena();this.previewRobot=robot('ram','cannon','#e6aa3c');this.scene.add(this.previewRobot.group);this.camera.position.set(7,5,8);this.target.set(0,.6,0);
+    // Compile pooled effect shaders at startup so the first shot does not stall combat.
+    this.renderer.compile(this.scene,this.camera);
     this.renderer.setAnimationLoop(()=>this.frame());
   }
   private buildArena():void {
@@ -96,22 +98,23 @@ export class GameScene {
     if(this.previewRobot.front===front&&this.previewRobot.top===top)return;this.removeRobot(this.previewRobot);this.previewRobot=robot(front,top,'#e6aa3c');this.scene.add(this.previewRobot.group);
   }
   update(state:RoomState|null,localId:string,input:Input,spectatorId?:string):void {
-    if(state!==this.priorState){if(state?.code!==this.priorState?.code)this.seenEvents.clear();if(state&&(state.round!==this.priorState?.round||state.phase==='loading'&&this.priorState?.phase!=='loading'))for(const p of state.players){const r=this.robots.get(p.id);if(r){r.group.position.set(p.x,0,p.z);r.group.rotation.y=p.yaw;}}this.lastSnapshot=performance.now();this.priorState=state;}
+    if(state!==this.priorState){if(state?.code!==this.priorState?.code||state?.round!==this.priorState?.round){this.seenEvents.clear();this.effects.clear();}if(state&&(state.round!==this.priorState?.round||state.phase==='loading'&&this.priorState?.phase!=='loading'))for(const p of state.players){const r=this.robots.get(p.id);if(r){r.group.position.set(p.x,0,p.z);r.group.rotation.y=p.yaw;}}this.lastSnapshot=performance.now();this.priorState=state;}
     this.state=state;this.localId=localId;this.input={...input};this.spectatorId=spectatorId??'';
   }
   setQuality(low:boolean):void {this.renderer.setPixelRatio(low?1:Math.min(window.devicePixelRatio,2));this.renderer.shadowMap.enabled=!low;}
   setReducedMotion(reduced:boolean):void {this.reduced=reduced;}
   aimScreen():{x:number;y:number}|null {if(!this.aim)return null;const p=this.aim.clone().project(this.camera);if(p.z>1)return null;return{x:(p.x*.5+.5)*this.canvas.clientWidth,y:(-.5*p.y+.5)*this.canvas.clientHeight};}
   private removeRobot(r:Robot):void {this.scene.remove(r.group);const materials=new Set<THREE.Material>();r.group.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();for(const m of Array.isArray(o.material)?o.material:[o.material])materials.add(m);}});for(const m of materials)if(![steel,dark,silver,rubber].includes(m as THREE.MeshStandardMaterial))m.dispose();}
-  private burst(x:number,z:number,big:boolean):void {if(this.reduced)return;for(let i=0;i<(big?22:9);i++){const mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(big?.16:.065,0),new THREE.MeshBasicMaterial({color:i%2?'#ffc456':'#ff642e',transparent:true}));mesh.position.set(x,.8,z);this.scene.add(mesh);const life=.3+Math.random()*(big?.8:.4);this.sparks.push({mesh,life,max:life,velocity:new THREE.Vector3((Math.random()-.5)*9,Math.random()*6,(Math.random()-.5)*9)});}}
   private animateRobot(r:Robot,p:PlayerState|undefined,time:number,dt:number):void {
     for(const w of r.wheels)w.rotation.x+=dt*r.speed/.46;
     if(r.saw)r.saw.rotation.y+=dt*(p?.frontActive?35:this.reduced?0:3);
     if(r.drill)r.drill.rotation.z+=dt*(p?.frontActive?29:this.reduced?0:2.2);
     if(r.hammer) {
-      const elapsed=WEAPONS.hammer.cooldown-(p?.frontCooldown??0);
-      // Strike immediately with the authoritative hit, then lift the head through its recovery.
-      r.hammer.rotation.x=p&&p.frontCooldown>0? .55-1.55*Math.min(1,Math.max(0,(elapsed-.12)/1.1)):-1;
+      // Interpolate between snapshots so the quick downswing still advances every frame.
+      const elapsed=WEAPONS.hammer.cooldown-(p?.frontCooldown??0)+Math.min(Math.max(0,(performance.now()-this.lastSnapshot)/1000),.05);
+      const down=Math.min(1,Math.max(0,elapsed/.18));
+      const up=Math.min(1,Math.max(0,(elapsed-.26)/1.1));
+      r.hammer.rotation.x=p&&p.frontCooldown>0? -1+1.55*down*down-1.55*up*up*(3-2*up):-1;
     }
     r.flame.visible=!!p?.topActive&&r.top==='flamethrower';r.flame.children.forEach((o,i)=>{o.scale.setScalar(this.reduced?1:1+Math.sin(time*35+i)*.2);o.rotation.z=this.reduced?i:time*6+i;});
     const cooldown=WEAPONS[r.top].cooldown,elapsed=cooldown-(p?.topCooldown??0);
@@ -131,21 +134,16 @@ export class GameScene {
       for(const[id,r]of this.robots)if(!state.players.some(p=>p.id===id)){this.removeRobot(r);this.robots.delete(id);}
       const watched=state.players.find(p=>p.id===(this.spectatorId||this.localId)&&p.alive)??state.players.find(p=>p.alive);const r=watched?this.robots.get(watched.id):undefined;
       if(r){const yaw=r.group.rotation.y, pos=r.group.position;const cameraPos=new THREE.Vector3(pos.x-Math.sin(yaw)*9,6.4,pos.z-Math.cos(yaw)*9);this.camera.position.lerp(cameraPos,this.reduced?1:1-Math.exp(-dt*6));this.target.lerp(new THREE.Vector3(pos.x+Math.sin(yaw)*3,.6,pos.z+Math.cos(yaw)*3),1-Math.exp(-dt*10));if(watched?.id===this.localId)this.aim=new THREE.Vector3(pos.x+Math.sin(yaw)*12,1.36,pos.z+Math.cos(yaw)*12);}
-      for(const event of state.events)if(!this.seenEvents.has(event.id)){this.seenEvents.add(event.id);this.burst(event.x,event.z,event.type==='elimination');}if(this.seenEvents.size>2000)this.seenEvents=new Set(state.events.map(e=>e.id));
-      for(const p of state.projectiles){let m=this.projectileMeshes.get(p.id);if(!m){
-        const rail=p.weapon==='railgun',pellet=p.weapon==='scattergun';
-        m=new THREE.Mesh(rail?new THREE.BoxGeometry(.12,.12,1.9):new THREE.SphereGeometry(pellet?.085:.16,6,6),new THREE.MeshBasicMaterial({color:rail?'#76f3ff':pellet?'#ff9e45':'#ffda79'}));
-        this.scene.add(m);this.projectileMeshes.set(p.id,m);
-      }m.visible=true;m.position.set(p.x,1.35,p.z);m.rotation.y=p.yaw;}
-      for(const[id,m]of this.projectileMeshes)if(!state.projectiles.some(p=>p.id===id)){this.scene.remove(m);m.geometry.dispose();(m.material as THREE.Material).dispose();this.projectileMeshes.delete(id);}
+      for(const event of state.events)if(!this.seenEvents.has(event.id)){this.seenEvents.add(event.id);if(!this.reduced)this.effects.burst(event.x,event.z,event.type==='elimination');}if(this.seenEvents.size>2000)this.seenEvents=new Set(state.events.map(e=>e.id));
+      this.effects.sync(state.projectiles);
     } else {
-      for(const r of this.robots.values())r.group.visible=false;for(const m of this.projectileMeshes.values())m.visible=false;
+      for(const r of this.robots.values())r.group.visible=false;this.effects.clear();
       this.previewRobot.group.rotation.y=this.reduced?-.65:-.65+Math.sin(time*.22)*.16;
       // Shift the preview into the right quarter, keeping long attachments clear of the garage cards.
       this.camera.setViewOffset(width,height,-width*.30,0,width,height);
       this.camera.position.lerp(new THREE.Vector3(6.3,4.5,7.8),.06);this.target.lerp(new THREE.Vector3(0,.65,0),.06);this.animateRobot(this.previewRobot,undefined,time,dt);
     }
-    for(let i=this.sparks.length-1;i>=0;i--){const s=this.sparks[i]!;s.life-=dt;if(s.life<=0){this.scene.remove(s.mesh);s.mesh.geometry.dispose();(s.mesh.material as THREE.Material).dispose();this.sparks.splice(i,1);continue;}s.velocity.y-=dt*10;s.mesh.position.addScaledVector(s.velocity,dt);(s.mesh.material as THREE.MeshBasicMaterial).opacity=s.life/s.max;}
+    this.effects.step(dt);
     this.camera.lookAt(this.target);this.renderer.render(this.scene,this.camera);
   }
 }

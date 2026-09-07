@@ -1,6 +1,6 @@
 # Rooftop / Rearmed
 
-A desktop 3D robot arena for 2–4 real players. Build a loadout, share a private room code, and push or destroy the other robots on an industrial rooftop. One life, five minutes, last robot standing; a timeout or simultaneous final elimination is a draw.
+A desktop 3D robot arena for solo practice against bots or private matches with 2–4 real players. Build a loadout, share a private room code, and push or destroy the other robots on an industrial rooftop. One life, five minutes, last robot standing; a timeout or simultaneous final elimination is a draw.
 
 Start locally with:
 
@@ -18,6 +18,12 @@ First-time setup requires **Node.js 22.12+ with npm**, then:
 Setup installs the pinned dependencies using `npm ci` and the committed lockfile. The startup script runs the client and multiplayer server together in the foreground, labels their output, and prints the browser URL (default **http://localhost:5173**). Ctrl+C stops both services and their subprocesses. It also works when invoked by its absolute path from another directory. Missing prerequisites and occupied ports produce startup errors.
 
 Open the printed URL in separate browser windows or on other computers, choose nicknames, and join the same room using its code or invite link. Each browser is an independent player; duplicate nicknames are supported. Everybody readies up, then the host starts. Weapons cannot change during a round. After results, Play again returns the group to its lobby with readiness cleared.
+
+## Solo practice with bots
+
+Start the local game with `./scripts/start-local.sh` and open http://localhost:5173. Enter a nickname, choose **Play with bots**, then **Ready up** and **Launch round**. Only one browser is needed. Your saved loadout is used; you can change it in the staging area.
+
+Three bots steer, aim, use their weapons, and try to avoid the edge. They follow the same damage, cooldown, heat, and elimination rules as human pilots. **Play again** returns to the lobby with bots ready for a rematch. Practice rooms are reserved for one human; use **Create private room** to play with friends.
 
 ## Controls and weapons
 
@@ -89,8 +95,10 @@ Typography uses Barlow Condensed and IBM Plex Sans, served by Google Fonts under
 
 ## Verification and limitations
 
-All 24 game-rule and multiplayer room tests pass, along with strict TypeScript checks and the production build. Startup was checked through `scripts/start-local.sh` from another working directory with alternate ports: both HTTP endpoints responded, occupied server and client ports produced clear errors, Ctrl+C exited cleanly and released both ports, and a child startup failure stopped the other service. Missing dependency handling and Bash/Node script syntax were also checked.
+All 30 automated game-rule, bot, rendering-resource, and multiplayer room tests pass, along with strict TypeScript checks and the production build. Startup was checked through `scripts/start-local.sh` from another working directory with alternate ports: both HTTP endpoints responded, occupied server and client ports produced clear errors, Ctrl+C exited cleanly and released both ports, and a child startup failure stopped the other service. Missing dependency handling and Bash/Node script syntax were also checked.
 
 Automated browser playthroughs cover two-, three-, and four-browser matches, loadouts, ready/countdown, menu settings, roof falls, results, rematches, spectator switching, host departure, invalid codes, text-only names, and blocked-storage room creation. Screenshots were inspected at 1440×900 and 1024×768. The repeatable browser check uses installed Google Chrome: start the game with `./scripts/start-local.sh`, then run `npm run test:browser` in another terminal. Set `BROWSER_URL` if the browser port is overridden. It captures screenshots in `artifacts/`. Human balancing of 2-, 3-, and 4-player matches still requires playtesting. The first version targets desktop keyboard play; mobile/touch controls, moving hazards, upgrades, and progression are outside scope. Server authority prevents trusting client damage or positions, but this prototype is not a production abuse-prevention service.
 
 The new-weapon browser regression is `node scripts/weapons-browser-check.mjs` with the local game running. It checks all four additions, saved loadouts, synchronized lobby choices, firing, combat damage, and weapon HUD states.
+
+The solo-practice browser regression is `node scripts/bots-browser-check.mjs`. It checks a single browser entering a room with three bots, combat through results, rematching, and leaving.
