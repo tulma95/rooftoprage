@@ -34,7 +34,8 @@ export class BattleHud {
       <p class="combat-message" aria-live="polite"></p>
       <div class="center-card glass"></div>
       <div class="countdown-label">ENGINES ON. STAY ON THE ROOF.</div>
-      <section class="results glass"></section>`;
+      <section class="results glass"></section>
+      <div class="cinematic-caption"><span>FINAL ELIMINATION</span>${button('skip-cinematic', 'Skip cinematic')}</div>`;
     this.aim.id = 'aim';
     this.aim.setAttribute('aria-hidden', 'true');
     this.aim.textContent = '⊹';

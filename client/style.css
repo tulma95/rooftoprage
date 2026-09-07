@@ -786,3 +786,18 @@ kbd {
     width: 100%;
   }
 }
+
+.cinematic-caption { display: none; }
+.cinematic .cinematic-caption {
+  display: flex; position: fixed; bottom: 7vh; left: 8%; right: 8%;
+  align-items: center; justify-content: space-between; pointer-events: auto;
+  letter-spacing: .22em; color: #f6d993; text-shadow: 0 2px 8px #000;
+}
+.cinematic .results, .cinematic .hud-health, .cinematic .hud-weapons,
+.cinematic .hud-roster, .cinematic .hud-timer, .cinematic .combat-message { visibility: hidden; }
+body.cinematic::before, body.cinematic::after {
+  content: ''; position: fixed; left: 0; right: 0; height: 5vh;
+  background: #080c0e; z-index: 3; pointer-events: none;
+}
+body.cinematic::before { top: 0; }
+body.cinematic::after { bottom: 0; }

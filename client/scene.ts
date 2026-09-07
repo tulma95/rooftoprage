@@ -1,3 +1,4 @@
+import { Finale, finalElimination } from './finale.js';
 import { ArenaHazards } from './hazards.js';
 import { driveTerrain } from '../shared/hazards.js';
 import * as THREE from 'three';
@@ -298,6 +299,7 @@ export class GameScene {
   private shake = 0;
   private hazards = new ArenaHazards();
   private effects: WeaponEffects;
+  private finale: Finale;
   private seenEvents = new Set<number>();
   private target = new THREE.Vector3();
   private aim: THREE.Vector3 | null = null;
@@ -332,6 +334,7 @@ export class GameScene {
     sun.shadow.bias = -0.0006;
     this.scene.add(sun);
     this.effects = new WeaponEffects(this.scene);
+    this.finale = new Finale(this.scene);
     this.buildArena();
     this.scene.add(this.hazards.group);
     this.previewRobot = robot('ram', 'cannon', '#e6aa3c');
@@ -408,6 +411,10 @@ export class GameScene {
   }
   update(state: RoomState | null, localId: string, input: Input, spectatorId?: string): void {
     if (state !== this.priorState) {
+      const finishingEvent = finalElimination(this.priorState, state);
+      if (finishingEvent) this.finale.start(finishingEvent,
+        state!.players.find(p => p.id === finishingEvent.playerId)?.yaw ?? 0);
+      if (!state || state.phase !== 'results') this.finale.stop();
       if (state?.code !== this.priorState?.code || state?.round !== this.priorState?.round) {
         this.seenEvents.clear();
         this.effects.clear();
@@ -433,6 +440,8 @@ export class GameScene {
     this.input = { ...input };
     this.spectatorId = spectatorId ?? '';
   }
+  get cinematicActive(): boolean { return this.finale.active; }
+  skipCinematic(): void { this.finale.stop(); }
   setCameraShake(enabled: boolean): void {
     this.shakeEnabled = enabled;
   }
@@ -556,7 +565,7 @@ export class GameScene {
         state.players.find((p) => p.id === (this.spectatorId || this.localId) && p.alive) ??
         state.players.find((p) => p.alive);
       const r = watched ? this.robots.get(watched.id) : undefined;
-      if (r) {
+      if (r && !this.finale.active) {
         const yaw = r.group.rotation.y,
           pos = r.group.position;
         const cameraPos = new THREE.Vector3(
@@ -606,6 +615,8 @@ export class GameScene {
       this.target.lerp(new THREE.Vector3(0, 0.65, 0), 0.06);
       this.animateRobot(this.previewRobot, undefined, time, dt);
     }
+    this.finale.step(dt, this.robots.get(this.finale.victimId ?? '')?.group, this.camera, this.target);
+    if (this.finale.active) this.aim = null;
     this.effects.step(dt);
     this.shake *= Math.exp(-dt * 13);
     this.camera.lookAt(this.target);

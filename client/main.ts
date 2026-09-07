@@ -328,6 +328,7 @@ app.addEventListener('click', async (e) => {
     modal = 'help';
     renderModal();
   }
+  if (action === 'skip-cinematic') scene.skipCinematic();
   if (action === 'spectate' && state) {
     const alive = state.players.filter((p) => p.alive);
     spectatorId =
@@ -341,6 +342,7 @@ setInterval(() => {
   if (playing() && performance.now() - lastSnapshot > 1500) renderHud();
 }, 50);
 function aimLoop() {
+  document.body.classList.toggle('cinematic', scene.cinematicActive);
   const aim = document.querySelector<HTMLElement>('#aim');
   if (aim) {
     const point = scene.aimScreen();
