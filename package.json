@@ -1,0 +1,36 @@
+{
+  "name": "continuous-rage-robots",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:server": "tsx server/index.ts",
+    "dev:client": "vite --host 0.0.0.0",
+    "build": "vite build && tsc -p tsconfig.server.json",
+    "start": "node dist-server/server/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "test:browser": "node scripts/browser-check.mjs"
+  },
+  "dependencies": {
+    "@colyseus/core": "0.18.11",
+    "@colyseus/sdk": "0.18.2",
+    "@colyseus/ws-transport": "0.18.2",
+    "express": "5.2.1",
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "26.5.0",
+    "@types/three": "0.185.4",
+    "tsx": "4.23.13",
+    "typescript": "7.0.2",
+    "vite": "8.2.2"
+  },
+  "overrides": {
+    "nanoid": "3.3.18"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
