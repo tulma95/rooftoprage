@@ -1,3 +1,6 @@
+import { sendClientMessage } from '../shared/protocol.js';
+import { onServerMessage } from './messages.js';
+import { isScreen, type Screen, type Modal } from './navigation.js';
 import { Client, type Room } from '@colyseus/sdk';
 import { GameScene } from './scene.js';
 import { SynthwaveMusic } from './music.js';
@@ -54,9 +57,9 @@ try {
 } catch {
   /* Storage is optional. */
 }
-let screen = nickname ? 'home' : 'name',
-  modal = '',
-  busy = false,
+let screen: Screen = nickname ? 'home' : 'name';
+let modal: Modal = '';
+let busy = false,
   online = false,
   error = '',
   room: Room | null = null,
@@ -111,7 +114,7 @@ function watched(): PlayerState | undefined {
 function playing() {
   return !!state && ['loading', 'countdown', 'combat', 'results'].includes(state.phase);
 }
-function navigate(to: string) {
+function navigate(to: Screen) {
   if (room && (to === 'home' || to === 'play')) to = 'lobby';
   screen = to;
   error = '';
@@ -292,7 +295,7 @@ async function connect(code?: string, practice = false) {
     lastPhase = '';
     lastEvent = 0;
     state = null;
-    joined.onMessage('snapshot', (s: RoomState) => {
+    onServerMessage(joined, 'snapshot', (s: RoomState) => {
       if (room !== joined) return;
       state = s;
       lastSnapshot = performance.now();
@@ -322,7 +325,7 @@ async function connect(code?: string, practice = false) {
         screen = s.phase === 'lobby' ? 'lobby' : screen;
         modal = '';
         render();
-        if (s.phase === 'loading') requestAnimationFrame(() => joined.send('loaded'));
+        if (s.phase === 'loading') requestAnimationFrame(() => sendClientMessage(joined, 'loaded'));
       } else if (s.phase === 'lobby' && screen === 'lobby') {
         const signature = JSON.stringify([s.players, s.hostId, s.notice]);
         if (signature !== lobbySignature) {
@@ -331,7 +334,7 @@ async function connect(code?: string, practice = false) {
         }
       } else renderHud();
     });
-    joined.onMessage('notice', (message: string) => {
+    onServerMessage(joined, 'notice', (message: string) => {
       error = message;
       render();
     });
@@ -350,7 +353,7 @@ async function connect(code?: string, practice = false) {
       scene.update(null, '', EMPTY_INPUT);
       render();
     });
-    joined.send('sync');
+    sendClientMessage(joined, 'sync');
     screen = 'lobby';
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
@@ -364,7 +367,7 @@ async function connect(code?: string, practice = false) {
     render();
   }
 }
-async function leave(to = 'play') {
+async function leave(to: Screen = 'play') {
   const previous = room;
   room = null;
   state = null;
@@ -433,7 +436,7 @@ app.addEventListener('click', async (e) => {
   const action = el.dataset.action;
   if (!action) return;
   e.preventDefault();
-  if (['home', 'play', 'garage', 'help', 'settings', 'lobby'].includes(action)) {
+  if (isScreen(action)) {
     navigate(action);
     return;
   }
@@ -443,14 +446,14 @@ app.addEventListener('click', async (e) => {
   }
   if (action === 'save-equipment') {
     save();
-    room?.send('equipment', { front, top, chassis });
+    sendClientMessage(room, 'equipment', { front, top, chassis });
     navigate(room ? 'lobby' : 'home');
   }
   if (action === 'practice') void connect(undefined, true);
   if (action === 'create') void connect();
-  if (action === 'ready') room?.send('ready', !local()?.ready);
-  if (action === 'start') room?.send('start');
-  if (action === 'again') room?.send('again');
+  if (action === 'ready') sendClientMessage(room, 'ready', !local()?.ready);
+  if (action === 'start') sendClientMessage(room, 'start');
+  if (action === 'again') sendClientMessage(room, 'again');
   if (action === 'copy') {
     try {
       const url = new URL(location.href);
@@ -513,7 +516,7 @@ setInterval(() => {
   input.turn = enabled ? Number(keys.has('KeyA')) - Number(keys.has('KeyD')) : 0;
   input.front = !!enabled && keys.has('Space');
   input.top = !!enabled && keys.has('KeyE');
-  if (room && state?.phase === 'combat') room.send('input', input);
+  if (room && state?.phase === 'combat') sendClientMessage(room, 'input', input);
   scene.update(state, room?.sessionId || '', input, watched()?.id);
   if (playing() && performance.now() - lastSnapshot > 1500) renderHud();
 }, 50);

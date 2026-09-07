@@ -1,3 +1,5 @@
+import { clientMessageValidators, sendServerMessage } from '../shared/protocol.js';
+import type { ClientMessages, ServerMessages } from '../shared/game.js';
 import { randomBytes } from 'node:crypto';
 import { Room, type Client, ServerError } from '@colyseus/core';
 import {
@@ -6,7 +8,6 @@ import {
   makePlayer,
   validName,
   validEquipment,
-  validInput,
   type FrontWeapon,
   type TopWeapon,
 } from '../shared/game.js';
@@ -26,14 +27,14 @@ export class ArenaRoom extends Room {
     codes.add(this.roomId);
     this.sim.state.code = this.roomId;
     this.setPrivate(true);
-    this.onMessage('sync', (c) => c.send('snapshot', this.sim.state));
-    this.onMessage('input', (c, data: unknown) => {
-      if (validInput(data) && this.sim.state.phase === 'combat')
+    this.onClientMessage('sync', (c) => sendServerMessage(c, 'snapshot', this.sim.state));
+    this.onClientMessage('input', (c, data) => {
+      if (this.sim.state.phase === 'combat')
         this.sim.inputs.set(c.sessionId, { input: data, time: this.sim.time });
     });
-    this.onMessage('equipment', (c, data: unknown) => {
+    this.onClientMessage('equipment', (c, data) => {
       const p = this.player(c);
-      if (p && this.sim.state.phase === 'lobby' && validEquipment(data)) {
+      if (p && this.sim.state.phase === 'lobby') {
         p.front = data.front;
         p.top = data.top;
         p.chassis = data.chassis ?? p.chassis;
@@ -41,11 +42,11 @@ export class ArenaRoom extends Room {
         p.ready = false;
       }
     });
-    this.onMessage('ready', (c, data: unknown) => {
+    this.onClientMessage('ready', (c, data) => {
       const p = this.player(c);
-      if (p && this.sim.state.phase === 'lobby' && typeof data === 'boolean') p.ready = data;
+      if (p && this.sim.state.phase === 'lobby') p.ready = data;
     });
-    this.onMessage('start', (c) => {
+    this.onClientMessage('start', (c) => {
       const s = this.sim.state;
       if (
         c.sessionId !== s.hostId ||
@@ -53,15 +54,15 @@ export class ArenaRoom extends Room {
         s.players.length < 2 ||
         !s.players.every((p) => p.ready)
       )
-        return c.send('notice', 'The host can start once 2–4 players are ready.');
+        return sendServerMessage(c, 'notice', 'The host can start once 2–4 players are ready.');
       this.sim.start();
       void this.lock();
     });
-    this.onMessage('loaded', (c) => {
+    this.onClientMessage('loaded', (c) => {
       const p = this.player(c);
       if (p && this.sim.state.phase === 'loading') p.loaded = true;
     });
-    this.onMessage('again', () => {
+    this.onClientMessage('again', () => {
       if (this.sim.state.phase === 'results') this.lobby('Ready up for another round.');
     });
     this.onMessage('*', () => {});
@@ -70,8 +71,19 @@ export class ArenaRoom extends Room {
       const previousPhase = s.phase;
       this.sim.step(0.05);
       if (previousPhase !== 'lobby' && s.phase === 'lobby') void this.unlock();
-      this.broadcast('snapshot', s);
+      this.broadcastMessage('snapshot', s);
     }, 50);
+  }
+  private onClientMessage<K extends keyof ClientMessages>(
+    type: K,
+    handler: (client: Client, payload: ClientMessages[K]) => void,
+  ) {
+    this.onMessage(type, (client, payload: unknown) => {
+      if (clientMessageValidators[type](payload)) handler(client, payload);
+    });
+  }
+  private broadcastMessage<K extends keyof ServerMessages>(type: K, payload: ServerMessages[K]) {
+    this.broadcast(type, payload);
   }
   player(c: Client) {
     return this.sim.state.players.find((p) => p.id === c.sessionId);
@@ -112,7 +124,7 @@ export class ArenaRoom extends Room {
       });
       s.notice = 'Practice against three bots. Ready up, then launch when you are set.';
     }
-    c.send('snapshot', s);
+    sendServerMessage(c, 'snapshot', s);
   }
   onLeave(c: Client) {
     const previousPhase = this.sim.state.phase;
