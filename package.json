@@ -1,5 +1,5 @@
 {
-  "name": "continuous-rage-robots",
+  "name": "rooftop-rage",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,15 +14,16 @@
   },
   "dependencies": {
     "@colyseus/core": "0.18.11",
-    "@colyseus/sdk": "0.18.2",
     "@colyseus/ws-transport": "0.18.2",
-    "express": "5.2.1",
-    "three": "0.185.1"
+    "express": "5.2.1"
   },
   "devDependencies": {
+    "@colyseus/sdk": "0.18.2",
     "@playwright/test": "1.63.0",
+    "@types/express": "5.0.6",
     "@types/node": "26.5.0",
     "@types/three": "0.185.4",
+    "three": "0.185.1",
     "tsx": "4.23.13",
     "typescript": "7.0.2",
     "vite": "8.2.2"

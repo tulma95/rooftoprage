@@ -1,4 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import express from 'express';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { Server, Room, type Client, ServerError } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
@@ -31,9 +34,19 @@ export class ArenaRoom extends Room {
   lobby(notice: string) { const s = this.sim.state; s.phase = 'lobby'; s.players = s.players.filter(p => p.connected); s.players.forEach(p => { p.ready = false; p.loaded = false; }); s.notice = notice; this.sim.inputs.clear(); void this.unlock(); }
   onDispose() { codes.delete(this.roomId); }
 }
+const browserAssets = fileURLToPath(new URL('../../dist/', import.meta.url));
 const server = new Server({
   transport: new WebSocketTransport({ maxPayload: 2048 }),
-  express: app => { app.get('/', (_req: IncomingMessage, res: ServerResponse) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ status: 'ok', game: 'Rooftop / Rearmed' })); }); },
+  express: app => {
+    const health = (_req: IncomingMessage, res: ServerResponse) => { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ status: 'ok', game: 'Rooftop / Rearmed' })); };
+    app.get('/health', health);
+    if (existsSync(browserAssets)) {
+      app.use('/assets', express.static(`${browserAssets}/assets`, { immutable: true, maxAge: '1y' }));
+      app.use(express.static(browserAssets, { maxAge: 0 }));
+    } else {
+      app.get('/', health);
+    }
+  },
 });
 server.define('arena', ArenaRoom);
 await server.listen(Number(process.env.SERVER_PORT ?? 2567), '0.0.0.0');

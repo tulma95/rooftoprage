@@ -1,0 +1,14 @@
+name: rooftop-rage
+
+services:
+  game:
+    image: ${IMAGE:-rooftop-rage:local}
+    build: .
+    ports:
+      - "${HOST_PORT:-2567}:2567"
+    environment:
+      NODE_ENV: production
+      SERVER_PORT: 2567
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s

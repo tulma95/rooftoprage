@@ -6,7 +6,8 @@ const app = document.querySelector<HTMLElement>('#app')!;
 const canvas = document.querySelector<HTMLCanvasElement>('#world')!;
 let scene: GameScene;
 try { scene = new GameScene(canvas); } catch { app.innerHTML = '<section class="panel"><h1>3D unavailable</h1><p>This game requires WebGL. Enable hardware acceleration in your browser, then reload.</p></section>'; throw new Error('WebGL unavailable'); }
-const endpoint = import.meta.env.VITE_SERVER_URL || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:${import.meta.env.VITE_SERVER_PORT || '2567'}`;
+const serverAddress = import.meta.env.DEV ? `${location.hostname}:${import.meta.env.VITE_SERVER_PORT || '2567'}` : location.host;
+const endpoint = import.meta.env.VITE_SERVER_URL || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${serverAddress}`;
 const client = new Client(endpoint);
 let nickname = '', front: FrontWeapon = 'ram', top: TopWeapon = 'cannon';
 let settings = { audio: true, low: false, reduced: false, contrast: false };
@@ -95,4 +96,4 @@ window.addEventListener('keydown',e=>{if((e.target as HTMLElement).matches('inpu
 window.addEventListener('keyup',e=>keys.delete(e.code));window.addEventListener('blur',()=>keys.clear());document.addEventListener('visibilitychange',()=>{if(document.hidden)keys.clear();});
 setInterval(()=>{const enabled=state?.phase==='combat'&&local()?.alive&&!modal&&!document.hidden;input.forward=enabled?Number(keys.has('KeyW'))-Number(keys.has('KeyS')):0;input.turn=enabled?Number(keys.has('KeyA'))-Number(keys.has('KeyD')):0;input.front=!!enabled&&keys.has('Space');input.top=!!enabled&&keys.has('KeyE');if(room&&state?.phase==='combat')room.send('input',input);scene.update(state,room?.sessionId||'',input,watched()?.id);if(playing()&&performance.now()-lastSnapshot>1500)renderHud();},50);
 function aimLoop(){const aim=document.querySelector<HTMLElement>('#aim');if(aim){const point=scene.aimScreen();aim.style.display=point?'block':'none';if(point){aim.style.left=`${point.x}px`;aim.style.top=`${point.y}px`;}}requestAnimationFrame(aimLoop);}aimLoop();
-async function health(){try{const response=await fetch(endpoint.replace(/^ws/,'http'),{signal:AbortSignal.timeout(2500)});online=response.ok;}catch{online=false;}if(!room&&!busy){const badge=document.querySelector('.connection');if(badge){badge.textContent=online?'● SERVER ONLINE':'○ SERVER OFFLINE';badge.classList.toggle('connected',online);}}}void health();setInterval(()=>void health(),5000);if(nickname&&new URLSearchParams(location.search).has('room'))screen='play';render();
+async function health(){try{const response=await fetch(`${endpoint.replace(/^ws/,'http').replace(/\/$/, '')}/health`,{signal:AbortSignal.timeout(2500)});online=response.ok;}catch{online=false;}if(!room&&!busy){const badge=document.querySelector('.connection');if(badge){badge.textContent=online?'● SERVER ONLINE':'○ SERVER OFFLINE';badge.classList.toggle('connected',online);}}}void health();setInterval(()=>void health(),5000);if(nickname&&new URLSearchParams(location.search).has('room'))screen='play';render();

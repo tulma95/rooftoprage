@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-server
+.git
+.github
+.agents
+.codex
+.env
+.env.*
+artifacts
+coverage
+*.log
+.DS_Store

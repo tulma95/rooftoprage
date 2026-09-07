@@ -53,7 +53,7 @@ Defaults need no configuration. Copy `.env.example` to `.env` to override:
 | --- | --- | --- |
 | `CLIENT_PORT` | `5173` | Local Vite browser port |
 | `SERVER_PORT` | `2567` | Multiplayer HTTP / WebSocket port |
-| `VITE_SERVER_URL` | Derived from page hostname and server port | Explicit multiplayer URL, for example `wss://game-server.example.com` |
+| `VITE_SERVER_URL` | Development: page hostname + server port; production: page origin | Explicit multiplayer URL, for example `wss://game-server.example.com` |
 
 Ports must be distinct integers from 1024–65535. Exported environment variables take precedence over `.env`. Restart after changes; browser configuration is incorporated at build time for production.
 
@@ -68,7 +68,9 @@ npm run build
 npm start
 ```
 
-`build` creates browser assets in `dist/` and compiled server/shared code in `dist-server/`. `npm start` runs the compiled multiplayer server; serve `dist/` separately using a static web server. For public hosting, run Node continuously behind an HTTPS reverse proxy with WebSocket upgrade support. Serve the browser over HTTPS and set `VITE_SERVER_URL=wss://your-server-host` before building. Forward the proxy to the multiplayer port. Configure `SERVER_PORT` in the process environment for `npm start`; the local launcher loads `.env`, while production startup does not.
+`build` creates browser assets in `dist/` and compiled server/shared code in `dist-server/`. `npm start` serves both the browser and multiplayer HTTP/WebSocket traffic on port 2567. Production browser connections use the page’s hostname, port, and protocol automatically. For public hosting, put this port behind an HTTPS reverse proxy with WebSocket support. No `VITE_SERVER_URL` is needed for same-domain hosting. Run `./deploy.sh ghcr.io/owner/image` to build and publish to GHCR; `./deploy.sh --help` includes Coolify setup and automatic deployment options. Configure `SERVER_PORT` in the process environment for `npm start`; the local launcher loads `.env`, while production startup does not.
+
+The Docker runtime uses Alpine’s Node 24 package with only server dependencies and compiled assets. npm, Yarn, TypeScript, and browser-only libraries stay in the build stages. The default deployment target is Linux ARM64.
 
 One Node process owns its rooms in memory. A restart loses rooms and ends matches. This version has no persistence, accounts, reconnection into an active round, matchmaking, or multi-process room coordination. A dropped connection removes a lobby player or eliminates an active robot. Host ownership moves to the longest-present connected player. Empty rooms are disposed. Loading has a 20-second timeout and a three-second shared countdown.
 
