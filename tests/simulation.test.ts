@@ -163,3 +163,45 @@ test('later zero-damage attacks cannot steal a lethal hit in the same tick', () 
     assert.equal(sim.state.events.filter((e) => e.type === 'hit' && e.playerId === 'b').length, 1);
   }
 });
+
+test('round lifecycle waits for loading, counts down and resets after interruption', () => {
+  const sim = match();
+  sim.state.hostId = 'a';
+  sim.start();
+  sim.step(1);
+  assert.equal(sim.state.phase, 'loading');
+  sim.state.players.forEach((p) => {
+    p.loaded = true;
+  });
+  sim.step(0.05);
+  assert.equal(sim.state.phase, 'countdown');
+  sim.step(2);
+  assert.equal(sim.state.countdown, 1);
+  sim.disconnect('a');
+  assert.equal(sim.state.phase, 'lobby');
+  assert.equal(sim.state.hostId, 'b');
+  assert.ok(sim.state.players.every((p) => !p.ready && !p.loaded));
+  sim.state.players.push(makePlayer('c', 'New pilot', 'ram', 'cannon', 2));
+  sim.start();
+  sim.state.players.forEach((p) => {
+    p.loaded = true;
+  });
+  sim.step(0.05);
+  sim.step(2.95);
+  assert.equal(sim.state.phase, 'countdown');
+  sim.step(0.05);
+  assert.equal(sim.state.phase, 'combat');
+});
+
+test('loading timeout clears inputs and restores bot readiness', () => {
+  const sim = match();
+  sim.state.players[1]!.bot = true;
+  sim.start();
+  input(sim, 'a', { forward: 1 });
+  sim.step(20.05);
+  assert.equal(sim.state.phase, 'lobby');
+  assert.match(sim.state.notice, /timed out/);
+  assert.equal(sim.inputs.size, 0);
+  assert.equal(sim.state.players[0]!.ready, false);
+  assert.equal(sim.state.players[1]!.ready, true);
+});

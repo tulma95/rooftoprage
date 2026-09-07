@@ -39,6 +39,7 @@ export class Simulation {
   inputs = new Map<string, { input: Input; time: number }>();
   time = 0;
   serial = 0;
+  private phaseElapsed = 0;
   event(
     type: 'hit' | 'elimination' | 'shot',
     p: PlayerState,
@@ -58,6 +59,9 @@ export class Simulation {
   }
   start() {
     const s = this.state;
+    s.phase = 'loading';
+    s.notice = '';
+    this.phaseElapsed = 0;
     Object.assign(s, makeHazards());
     s.round++;
     s.remaining = ROUND_SECONDS;
@@ -88,6 +92,52 @@ export class Simulation {
       });
     });
   }
+  returnToLobby(notice: string) {
+    const s = this.state;
+    s.phase = 'lobby';
+    this.phaseElapsed = 0;
+    s.players = s.players.filter((p) => p.connected);
+    for (const p of s.players) {
+      p.ready = !!p.bot;
+      p.loaded = false;
+    }
+    s.notice = notice;
+    this.inputs.clear();
+  }
+
+  disconnect(id: string) {
+    const s = this.state;
+    const player = s.players.find((p) => p.id === id);
+    this.inputs.delete(id);
+    if (player) {
+      player.connected = false;
+      if (s.phase === 'combat') {
+        this.eliminate(player, 'disconnected');
+        this.finishIfNeeded();
+      } else if (s.phase === 'loading' || s.phase === 'countdown') {
+        this.returnToLobby('A player left before combat. Ready up again.');
+      }
+      if (s.phase === 'lobby') s.players = s.players.filter((p) => p.id !== id);
+    }
+    if (s.hostId === id) s.hostId = s.players.find((p) => p.connected && !p.bot)?.id ?? '';
+  }
+
+  private advanceLoading(dt: number) {
+    const s = this.state;
+    this.phaseElapsed += dt;
+    if (s.phase === 'loading') {
+      if (s.players.every((p) => p.loaded)) {
+        s.phase = 'countdown';
+        this.phaseElapsed = 0;
+      } else if (this.phaseElapsed > 20) {
+        this.returnToLobby('Loading timed out. Check your connection and try again.');
+      }
+    } else if (s.phase === 'countdown') {
+      s.countdown = Math.max(0, 3 - this.phaseElapsed);
+      if (s.countdown === 0) s.phase = 'combat';
+    }
+  }
+
   eliminate(p: PlayerState, reason: string, attackerId?: string) {
     if (!p.alive) return;
     p.alive = false;
@@ -111,6 +161,7 @@ export class Simulation {
   step(dt: number) {
     this.time += dt;
     const s = this.state;
+    this.advanceLoading(dt);
     if (s.phase !== 'combat') return;
     s.remaining = Math.max(0, s.remaining - dt);
     const active = s.players.filter((p) => p.alive);
