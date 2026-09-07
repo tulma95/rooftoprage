@@ -5,6 +5,7 @@ import {
   OIL_SLICKS,
   COOLING_POOLS,
   HAZARD_RULES as H,
+  type Tank,
 } from '../shared/hazards.js';
 import {
   ARENA_HALF,
@@ -20,6 +21,13 @@ import {
   type RoomState,
 } from '../shared/game.js';
 import { botInput } from './bots.js';
+interface TickDamage {
+  lastAttacker: Map<string, string>;
+  hurt(player: PlayerState, amount: number, attackerId?: string): void;
+  hitTank(tank: Tank, amount: number, attackerId: string): void;
+  explode(tank: Tank, attackerId?: string): void;
+}
+
 export class Simulation {
   state: RoomState = {
     code: '',
@@ -165,6 +173,21 @@ export class Simulation {
     if (s.phase !== 'combat') return;
     s.remaining = Math.max(0, s.remaining - dt);
     const active = s.players.filter((p) => p.alive);
+    const damage = this.damageForTick(active);
+    for (const oil of s.oil) oil.burning = Math.max(0, oil.burning - dt);
+    this.moveAndFire(active, dt);
+    this.resolveRobotCollisions(active);
+    this.resolveTankContact(active, dt, damage);
+    this.resolveCloseCombat(active, dt, damage);
+    this.advanceProjectiles(active, dt, damage);
+    this.applyBurning(active, dt, damage);
+    // Keep the tick's active roster until all attacks resolve, allowing simultaneous KOs.
+    this.resolveEliminations(active, damage.lastAttacker);
+    this.finishIfNeeded();
+  }
+
+  private damageForTick(active: PlayerState[]): TickDamage {
+    const s = this.state;
     const lastAttacker = new Map<string, string>();
     const hurt = (p: PlayerState, amount: number, attackerId?: string) => {
       if (!p.alive || p.hp <= 0 || amount <= 0) return;
@@ -207,7 +230,11 @@ export class Simulation {
       if (tank.hp <= amount) explode(tank, attackerId);
       else tank.hp -= amount;
     };
-    for (const oil of s.oil) oil.burning = Math.max(0, oil.burning - dt);
+    return { lastAttacker, hurt, hitTank, explode };
+  }
+
+  private moveAndFire(active: PlayerState[], dt: number) {
+    const s = this.state;
     for (const p of active) {
       const stored = this.inputs.get(p.id);
       const input = p.bot
@@ -244,6 +271,9 @@ export class Simulation {
         this.event('shot', p);
       }
     }
+  }
+
+  private resolveRobotCollisions(active: PlayerState[]) {
     for (let i = 0; i < active.length; i++)
       for (let j = i + 1; j < active.length; j++) {
         const a = active[i]!,
@@ -261,6 +291,11 @@ export class Simulation {
           b.z += nz * overlap;
         }
       }
+  }
+
+  private resolveTankContact(active: PlayerState[], dt: number, damage: TickDamage) {
+    const s = this.state;
+    const { hitTank } = damage;
     for (const p of active) {
       for (const tank of s.tanks) {
         if (tank.hp <= 0) continue;
@@ -299,6 +334,10 @@ export class Simulation {
             Object.assign(s.oil[i]!, { burning: H.oilBurnSeconds, attackerId: p.id });
         });
     }
+  }
+
+  private resolveCloseCombat(active: PlayerState[], dt: number, damage: TickDamage) {
+    const { hurt } = damage;
     for (const a of active)
       for (const b of active) {
         if (a === b) continue;
@@ -321,6 +360,11 @@ export class Simulation {
           hurt(b, WEAPONS.flamethrower.damage * dt, a.id);
         }
       }
+  }
+
+  private advanceProjectiles(active: PlayerState[], dt: number, damage: TickDamage) {
+    const s = this.state;
+    const { hurt, hitTank } = damage;
     s.projectiles = s.projectiles.filter((q) => {
       const rule = PROJECTILE_RULES[q.weapon],
         weapon = WEAPONS[q.weapon];
@@ -372,6 +416,11 @@ export class Simulation {
         }
       return q.distance < weapon.range;
     });
+  }
+
+  private applyBurning(active: PlayerState[], dt: number, damage: TickDamage) {
+    const s = this.state;
+    const { hurt, explode } = damage;
     for (const tank of s.tanks)
       if (tank.hp > 0) {
         const oilIndex = OIL_SLICKS.findIndex(
@@ -400,11 +449,13 @@ export class Simulation {
         p.burning = Math.max(0, (p.burning ?? 0) - dt);
       }
     }
+  }
+
+  private resolveEliminations(active: PlayerState[], lastAttacker: Map<string, string>) {
     for (const p of active) {
       if (p.hp <= 0) this.eliminate(p, 'destroyed', lastAttacker.get(p.id));
       else if (Math.abs(p.x) > ARENA_HALF || Math.abs(p.z) > ARENA_HALF)
         this.eliminate(p, 'fell off the roof', lastAttacker.get(p.id));
     }
-    this.finishIfNeeded();
   }
 }
