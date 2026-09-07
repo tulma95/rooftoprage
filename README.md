@@ -34,7 +34,19 @@ Three bots steer, aim, use their weapons, and try to avoid the edge. They follow
 | Space | Activate front weapon |
 | E | Activate top weapon |
 
-Each robot has 100 health and one weapon per slot. Hold an activation key to repeat attacks or sustain the saw, drill, or flame. Damage, cooldown, heat, and results are decided by the server. Distances below are world units; the roof is 44 × 44 units. The editable definitions are in `shared/game.ts`.
+Each robot has a selectable chassis and one weapon per slot. Hold an activation key to repeat attacks or sustain the saw, drill, or flame. Damage, cooldown, heat, and results are decided by the server. Distances below are world units; the roof is 56 × 56 units. The editable definitions are in `shared/game.ts`.
+
+Choose a chassis in the garage; all chassis support every weapon combination.
+
+| Chassis | Health | Forward / reverse speed | Turn rate | Role |
+|---|---:|---:|---:|---|
+| Dart | 70 | 11 / 7 | 2.9 | Fast, fragile skirmisher |
+| Mule | 100 | 8 / 5 | 2.25 | Balanced original |
+| Bruiser | 130 | 6.5 / 4 | 1.95 | Armored brawler |
+| Bulwark | 170 | 5 / 3 | 1.5 | Slow heavy tank |
+
+Speeds are units/second and turn rates are radians/second. Chassis share the same collision footprint. Practice bots use the three new chassis.
+
 
 | Slot | Weapon | Damage | Range | Behavior / limit |
 | --- | --- | --- | --- | --- |

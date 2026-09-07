@@ -21,7 +21,7 @@ try {
   await p.screenshot({path:'artifacts/combat.png'});
   await p.getByRole('button',{name:'Menu / Esc'}).click();await p.locator('[data-setting="audio"]').uncheck();await p.getByRole('button',{name:'Resume',exact:true}).click();
   // Drive away from the other robot and off the open rooftop.
-  await q.keyboard.down('KeyS');await q.waitForTimeout(3500);await q.keyboard.up('KeyS');
+  await q.keyboard.down('KeyS');await q.waitForTimeout(4200);await q.keyboard.up('KeyS');
   await p.locator('.results h1').filter({hasText:'VICTORY'}).waitFor({timeout:8000});await q.locator('.results h1').filter({hasText:'ELIMINATED'}).waitFor();
   await p.screenshot({path:'artifacts/results.png'});
   await p.getByRole('button',{name:'Play again',exact:true}).click();await p.locator('.room-code').waitFor();await q.locator('.room-code').waitFor();
@@ -42,7 +42,7 @@ try {
     await pages[0].getByRole('button',{name:'Launch round'}).click();
     for(const page of pages)await page.locator('#aim').waitFor({timeout:10000});
     await pages[0].screenshot({path:`artifacts/combat-${count}-1024.png`});
-    await pages[0].keyboard.down('KeyS');await pages[0].waitForTimeout(2800);await pages[0].keyboard.up('KeyS');
+    await pages[0].keyboard.down('KeyS');await pages[0].waitForTimeout(4200);await pages[0].keyboard.up('KeyS');
     await pages[0].locator('.spectator').waitFor();
     assert.equal(await pages[0].locator('#aim').count(),0);
     assert.equal(await pages[0].locator('.hud-weapons kbd').count(),0);
@@ -53,7 +53,7 @@ try {
     await pages[0].screenshot({path:`artifacts/spectating-${count}.png`});
     // Remove eliminated host; live battle must continue in the other browsers.
     await pages[0].getByRole('button',{name:'Leave match',exact:true}).click();await pages[0].getByRole('button',{name:'Leave match',exact:true}).last().click();
-    for(let i=1;i<count-1;i++){await pages[i].keyboard.down('KeyS');await pages[i].waitForTimeout(2800);await pages[i].keyboard.up('KeyS');}
+    for(let i=1;i<count-1;i++){await pages[i].keyboard.down('KeyS');await pages[i].waitForTimeout(4200);await pages[i].keyboard.up('KeyS');}
     await pages[count-1].locator('.results h1').filter({hasText:'VICTORY'}).waitFor({timeout:8000});
     for(const context of contexts)await context.close();
   }

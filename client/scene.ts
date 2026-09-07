@@ -1,8 +1,10 @@
+import { ArenaHazards } from './hazards.js';
+import { driveTerrain } from '../shared/hazards.js';
 import * as THREE from 'three';
 import { WeaponEffects } from './weapon-effects.js';
-import { drive, WEAPONS, type FrontWeapon, type TopWeapon, type RoomState, type Input, type PlayerState } from '../shared/game.js';
+import { ARENA_HALF, type Chassis, WEAPONS, type FrontWeapon, type TopWeapon, type RoomState, type Input, type PlayerState } from '../shared/game.js';
 
-interface Robot { group: THREE.Group; wheels: THREE.Mesh[]; saw?: THREE.Group; hammer?: THREE.Group; drill?: THREE.Group; barrel: THREE.Group; flame: THREE.Group; front: FrontWeapon; top: TopWeapon; speed: number }
+interface Robot { chassis: Chassis; group: THREE.Group; wheels: THREE.Mesh[]; saw?: THREE.Group; hammer?: THREE.Group; drill?: THREE.Group; barrel: THREE.Group; burn: THREE.Group; flame: THREE.Group; front: FrontWeapon; top: TopWeapon; speed: number }
 const steel = new THREE.MeshStandardMaterial({ color: '#3c4444', roughness: .78, metalness: .7 });
 const dark = new THREE.MeshStandardMaterial({ color: '#171d1c', roughness: .85, metalness: .4 });
 const silver = new THREE.MeshStandardMaterial({ color: '#899593', roughness: .5, metalness: .85 });
@@ -13,7 +15,7 @@ function box(parent: THREE.Object3D, x: number, y: number, z: number, w: number,
 function cylinder(parent: THREE.Object3D, x:number,y:number,z:number,r:number,len:number,material:THREE.Material,axis:'x'|'z'|'y'='y',segments=12):THREE.Mesh {
   const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,segments),material); m.position.set(x,y,z); if(axis==='x')m.rotation.z=Math.PI/2;if(axis==='z')m.rotation.x=Math.PI/2;m.castShadow=true;parent.add(m);return m;
 }
-function robot(front:FrontWeapon,top:TopWeapon,color:string):Robot {
+function robot(front:FrontWeapon,top:TopWeapon,color:string,chassis:Chassis='mule'):Robot {
   const group=new THREE.Group(), paint=new THREE.MeshStandardMaterial({color,metalness:.58,roughness:.65});
   box(group,0,.62,0,1.75,.48,2.35,steel);box(group,0,.95,-.12,1.62,.34,1.65,paint);
   const hood=box(group,0,1.09,.49,1.4,.13,.65,paint); hood.rotation.x=-.18;
@@ -24,6 +26,17 @@ function robot(front:FrontWeapon,top:TopWeapon,color:string):Robot {
   for(const x of [-1,1])for(const z of [-.78,.78]) {const wheel=cylinder(group,x,.45,z,.46,.36,rubber,'x',16);wheels.push(wheel);cylinder(group,x*1.19,.45,z,.25,.045,steel,'x');cylinder(group,x*1.22,.45,z,.095,.05,paint,'x');box(group,x,.94,z,.45,.12,.95,paint);}
   for(const x of [-.57,.57])box(group,x,.79,1.2,.25,.11,.035,new THREE.MeshStandardMaterial({color:'#f8e6a9',emissive:'#f5ca63',emissiveIntensity:2}));
   cylinder(group,-.61,1.26,-.85,.09,.65,dark);cylinder(group,-.61,1.6,-.85,.13,.07,silver);
+  // Keep attachment positions and collision footprint consistent across chassis.
+  if(chassis==='dart') {
+    for(const x of [-.7,.7]) {box(group,x,1.17,-.85,.12,.22,.65,silver);box(group,x,.7,-1.3,.18,.18,.55,dark);}
+    box(group,0,1.35,-.95,1.8,.08,.32,paint);
+  } else if(chassis==='bruiser') {
+    for(const x of [-.84,.84]) {box(group,x,.94,0,.2,.55,1.8,paint);for(const z of [-.6,0,.6])box(group,x*1.15,1.03,z,.08,.3,.16,silver);}
+    box(group,0,1.2,-.55,1.35,.22,.6,steel);
+  } else if(chassis==='bulwark') {
+    for(const x of [-1,1]) {box(group,x,.48,0,.4,.7,2.4,rubber);box(group,x,.93,0,.44,.2,2.5,paint);for(let z=-1;z<=1;z+=.25)box(group,x,.12,z,.42,.08,.1,silver);}
+    box(group,0,1.19,-.52,1.65,.3,.92,paint);box(group,0,.81,-1.2,1.8,.65,.22,steel);
+  }
   let saw:THREE.Group|undefined, hammer:THREE.Group|undefined, drill:THREE.Group|undefined;
   if(front==='ram') {const blade=box(group,0,.46,1.42,2.13,.55,.3,paint);blade.rotation.x=.33;box(group,0,.23,1.54,2.17,.095,.12,silver);for(const x of [-.7,0,.7])box(group,x,.53,1.6,.1,.34,.09,dark);}
   else if(front==='saw') {for(const x of [-.47,.47])box(group,x,.62,1.32,.16,.16,.8,steel);saw=new THREE.Group();saw.position.set(0,.59,1.65);group.add(saw);cylinder(saw,0,0,0,.63,.1,silver,'y',20);for(let i=0;i<12;i++){const tooth=box(saw,Math.sin(i*Math.PI/6)*.61,0,Math.cos(i*Math.PI/6)*.61,.18,.12,.22,silver);tooth.rotation.y=i*Math.PI/6+.4;}cylinder(saw,0,.08,0,.2,.12,paint);}
@@ -63,39 +76,41 @@ function robot(front:FrontWeapon,top:TopWeapon,color:string):Robot {
   }
   const flame=new THREE.Group();flame.position.set(0,1.36,1);group.add(flame);
   for(let i=0;i<7;i++){const m=new THREE.Mesh(new THREE.IcosahedronGeometry(.22+i*.065,0),new THREE.MeshBasicMaterial({color:i<2?'#fff0ac':i<4?'#ffb52e':'#e95a18',transparent:true,opacity:.8-i*.065}));m.position.z=i*.55;flame.add(m);}flame.visible=false;
-  return {group,wheels,saw,hammer,drill,barrel,flame,front,top,speed:0};
+  const burn=flame.clone();burn.position.set(0,.5,-.4);burn.rotation.x=-Math.PI/2;burn.scale.setScalar(.65);group.add(burn);
+  return {chassis,group,burn,wheels,saw,hammer,drill,barrel,flame,front,top,speed:0};
 }
 
 export class GameScene {
   private scene=new THREE.Scene(); private camera=new THREE.PerspectiveCamera(48,1,.1,240); private renderer:THREE.WebGLRenderer;
   private robots=new Map<string,Robot>();private previewRobot:Robot;private state:RoomState|null=null;private localId='';private spectatorId='';
   private input:Input={forward:0,turn:0,front:false,top:false};private lastSnapshot=0;private priorState:RoomState|null=null;private clock=new THREE.Clock();private reduced=false;
+  private hazards=new ArenaHazards();
   private effects:WeaponEffects;private seenEvents=new Set<number>();private target=new THREE.Vector3();private aim:THREE.Vector3|null=null;
   constructor(private canvas:HTMLCanvasElement) {
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.3;
     this.scene.background=new THREE.Color('#141f22');this.scene.fog=new THREE.FogExp2('#263536',.011);
-    this.scene.add(new THREE.HemisphereLight('#c9e0d8','#43362a',2.5));const sun=new THREE.DirectionalLight('#ffdb9c',3.1);sun.position.set(-16,35,12);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-32,right:32,top:32,bottom:-32,near:1,far:90});sun.shadow.bias=-.0006;this.scene.add(sun);
-    this.effects=new WeaponEffects(this.scene);this.buildArena();this.previewRobot=robot('ram','cannon','#e6aa3c');this.scene.add(this.previewRobot.group);this.camera.position.set(7,5,8);this.target.set(0,.6,0);
+    this.scene.add(new THREE.HemisphereLight('#c9e0d8','#43362a',2.5));const sun=new THREE.DirectionalLight('#ffdb9c',3.1);sun.position.set(-16,35,12);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-ARENA_HALF-10,right:ARENA_HALF+10,top:ARENA_HALF+10,bottom:-ARENA_HALF-10,near:1,far:90});sun.shadow.bias=-.0006;this.scene.add(sun);
+    this.effects=new WeaponEffects(this.scene);this.buildArena();this.scene.add(this.hazards.group);this.previewRobot=robot('ram','cannon','#e6aa3c');this.scene.add(this.previewRobot.group);this.camera.position.set(7,5,8);this.target.set(0,.6,0);
     // Compile pooled effect shaders at startup so the first shot does not stall combat.
     this.renderer.compile(this.scene,this.camera);
     this.renderer.setAnimationLoop(()=>this.frame());
   }
   private buildArena():void {
     const concrete=new THREE.MeshStandardMaterial({color:'#626761',roughness:.96,metalness:.05}), lines=new THREE.MeshStandardMaterial({color:'#b99b45',roughness:.9});
-    box(this.scene,0,-.4,0,44,.8,44,concrete);box(this.scene,0,-3,0,43,5,43,dark);
+    box(this.scene,0,-.4,0,ARENA_HALF*2,.8,ARENA_HALF*2,concrete);box(this.scene,0,-3,0,ARENA_HALF*2-1,5,ARENA_HALF*2-1,dark);
     // Roof expansion joints and inset safety stripes leave the edge entirely open.
-    for(let i=-20;i<=20;i+=4){box(this.scene,i,.005,0,.026,.012,43,steel);box(this.scene,0,.006,i,43,.012,.026,steel);}
-    for(const side of [-1,1])for(let i=-21;i<22;i+=1.4){box(this.scene,i,.018,side*21.35,.7,.026,.4,lines);box(this.scene,side*21.35,.018,i,.4,.026,.7,lines);}
+    for(let i=-ARENA_HALF+4;i<ARENA_HALF;i+=4){box(this.scene,i,.005,0,.026,.012,ARENA_HALF*2-1,steel);box(this.scene,0,.006,i,ARENA_HALF*2-1,.012,.026,steel);}
+    for(const side of [-1,1])for(let i=-ARENA_HALF+1;i<ARENA_HALF;i+=1.4){box(this.scene,i,.018,side*(ARENA_HALF-.65),.7,.026,.4,lines);box(this.scene,side*(ARENA_HALF-.65),.018,i,.4,.026,.7,lines);}
     const ring=new THREE.Mesh(new THREE.RingGeometry(5.8,5.9,64),lines);ring.rotation.x=-Math.PI/2;ring.position.y=.02;this.scene.add(ring);
     for(const side of [-1,1]){box(this.scene,side*10,.018,0,3,.015,.1,lines);box(this.scene,0,.018,side*10,.1,.015,3,lines);}
     // All buildings and equipment stand outside the combat roof.
-    for(let i=0;i<42;i++) {const angle=i*2.39996;const radius=39+(i%5)*10;const h=6+(i*17%24);const x=Math.sin(angle)*radius,z=Math.cos(angle)*radius;const mat=new THREE.MeshStandardMaterial({color:new THREE.Color().setHSL(.43,.07,.17+(i%4)*.025),roughness:1});box(this.scene,x,h/2-18,z,7+(i%3)*3,h,7+(i%4),mat);for(let floor=0;floor<h-2;floor+=3)box(this.scene,x,h-19-floor,z+4+(i%4)/2,4,.22,.03,steel);box(this.scene,x,h-17.6,z,3,.8,2,steel);}
-    for(const x of [-27,27]){box(this.scene,x,-1,0,3,3,9,steel);for(let z=-3;z<=3;z+=3)cylinder(this.scene,x,.65,z,1,.25,dark);}
-    const mast=new THREE.Group();mast.position.set(-30,-3,-20);box(mast,0,6,0,.25,12,.25,silver);box(mast,0,10,0,4,.15,.15,steel);this.scene.add(mast);
+    for(let i=0;i<42;i++) {const angle=i*2.39996;const radius=ARENA_HALF+20+(i%5)*10;const h=6+(i*17%24);const x=Math.sin(angle)*radius,z=Math.cos(angle)*radius;const mat=new THREE.MeshStandardMaterial({color:new THREE.Color().setHSL(.43,.07,.17+(i%4)*.025),roughness:1});box(this.scene,x,h/2-18,z,7+(i%3)*3,h,7+(i%4),mat);for(let floor=0;floor<h-2;floor+=3)box(this.scene,x,h-19-floor,z+4+(i%4)/2,4,.22,.03,steel);box(this.scene,x,h-17.6,z,3,.8,2,steel);}
+    for(const x of [-ARENA_HALF-5,ARENA_HALF+5]){box(this.scene,x,-1,0,3,3,9,steel);for(let z=-3;z<=3;z+=3)cylinder(this.scene,x,.65,z,1,.25,dark);}
+    const mast=new THREE.Group();mast.position.set(-ARENA_HALF-8,-3,-20);box(mast,0,6,0,.25,12,.25,silver);box(mast,0,10,0,4,.15,.15,steel);this.scene.add(mast);
   }
-  preview(front:FrontWeapon,top:TopWeapon):void {
-    if(this.previewRobot.front===front&&this.previewRobot.top===top)return;this.removeRobot(this.previewRobot);this.previewRobot=robot(front,top,'#e6aa3c');this.scene.add(this.previewRobot.group);
+  preview(front:FrontWeapon,top:TopWeapon,chassis:Chassis='mule'):void {
+    if(this.previewRobot.front===front&&this.previewRobot.top===top&&this.previewRobot.chassis===chassis)return;this.removeRobot(this.previewRobot);this.previewRobot=robot(front,top,'#e6aa3c',chassis);this.scene.add(this.previewRobot.group);
   }
   update(state:RoomState|null,localId:string,input:Input,spectatorId?:string):void {
     if(state!==this.priorState){if(state?.code!==this.priorState?.code||state?.round!==this.priorState?.round){this.seenEvents.clear();this.effects.clear();}if(state&&(state.round!==this.priorState?.round||state.phase==='loading'&&this.priorState?.phase!=='loading'))for(const p of state.players){const r=this.robots.get(p.id);if(r){r.group.position.set(p.x,0,p.z);r.group.rotation.y=p.yaw;}}this.lastSnapshot=performance.now();this.priorState=state;}
@@ -116,6 +131,7 @@ export class GameScene {
       const up=Math.min(1,Math.max(0,(elapsed-.26)/1.1));
       r.hammer.rotation.x=p&&p.frontCooldown>0? -1+1.55*down*down-1.55*up*up*(3-2*up):-1;
     }
+    r.burn.visible=!!p?.burning;
     r.flame.visible=!!p?.topActive&&r.top==='flamethrower';r.flame.children.forEach((o,i)=>{o.scale.setScalar(this.reduced?1:1+Math.sin(time*35+i)*.2);o.rotation.z=this.reduced?i:time*6+i;});
     const cooldown=WEAPONS[r.top].cooldown,elapsed=cooldown-(p?.topCooldown??0);
     r.barrel.position.z=-.13-(cooldown>0&&p&&p.topCooldown>0?Math.max(0,1-elapsed/.16)*.14:0);
@@ -124,17 +140,18 @@ export class GameScene {
     const dt=Math.min(this.clock.getDelta(),.05),time=this.clock.elapsedTime;const width=this.canvas.clientWidth,height=this.canvas.clientHeight;
     if(!width||!height)return;const size=this.renderer.getSize(new THREE.Vector2());if(size.x!==width||size.y!==height){this.renderer.setSize(width,height,false);this.camera.aspect=width/height;this.camera.updateProjectionMatrix();}
     const combat=!!this.state&&['loading','countdown','combat','results'].includes(this.state.phase);this.previewRobot.group.visible=!combat;this.aim=null;
+    this.hazards.update(this.state,combat,time,this.reduced);
     if(combat&&this.state){
       if(this.camera.view?.enabled)this.camera.clearViewOffset();
       const state=this.state;
-      for(const p of state.players){let r=this.robots.get(p.id);if(r&&(r.front!==p.front||r.top!==p.top)){this.removeRobot(r);this.robots.delete(p.id);r=undefined;}if(!r){r=robot(p.front,p.top,p.color);r.group.position.set(p.x,0,p.z);r.group.rotation.y=p.yaw;this.robots.set(p.id,r);this.scene.add(r.group);}r.group.visible=p.alive;
-        const predicted={x:p.x,z:p.z,yaw:p.yaw};if(p.id===this.localId&&state.phase==='combat'&&p.alive)drive(predicted,this.input,Math.min((performance.now()-this.lastSnapshot)/1000,.085));
+      for(const p of state.players){let r=this.robots.get(p.id);if(r&&(r.front!==p.front||r.top!==p.top||r.chassis!==p.chassis)){this.removeRobot(r);this.robots.delete(p.id);r=undefined;}if(!r){r=robot(p.front,p.top,p.color,p.chassis);r.group.position.set(p.x,0,p.z);r.group.rotation.y=p.yaw;this.robots.set(p.id,r);this.scene.add(r.group);}r.group.visible=p.alive;
+        const predicted={chassis:p.chassis,x:p.x,z:p.z,yaw:p.yaw};if(p.id===this.localId&&state.phase==='combat'&&p.alive)driveTerrain(predicted,this.input,Math.min((performance.now()-this.lastSnapshot)/1000,.085));
         const smooth=1-Math.exp(-dt*17);const oldX=r.group.position.x,oldZ=r.group.position.z;r.group.position.lerp(new THREE.Vector3(predicted.x,0,predicted.z),smooth);r.group.rotation.y+=Math.atan2(Math.sin(predicted.yaw-r.group.rotation.y),Math.cos(predicted.yaw-r.group.rotation.y))*smooth;r.speed=dt>0?((r.group.position.x-oldX)*Math.sin(r.group.rotation.y)+(r.group.position.z-oldZ)*Math.cos(r.group.rotation.y))/dt:0;this.animateRobot(r,p,time,dt);
       }
       for(const[id,r]of this.robots)if(!state.players.some(p=>p.id===id)){this.removeRobot(r);this.robots.delete(id);}
       const watched=state.players.find(p=>p.id===(this.spectatorId||this.localId)&&p.alive)??state.players.find(p=>p.alive);const r=watched?this.robots.get(watched.id):undefined;
       if(r){const yaw=r.group.rotation.y, pos=r.group.position;const cameraPos=new THREE.Vector3(pos.x-Math.sin(yaw)*9,6.4,pos.z-Math.cos(yaw)*9);this.camera.position.lerp(cameraPos,this.reduced?1:1-Math.exp(-dt*6));this.target.lerp(new THREE.Vector3(pos.x+Math.sin(yaw)*3,.6,pos.z+Math.cos(yaw)*3),1-Math.exp(-dt*10));if(watched?.id===this.localId)this.aim=new THREE.Vector3(pos.x+Math.sin(yaw)*12,1.36,pos.z+Math.cos(yaw)*12);}
-      for(const event of state.events)if(!this.seenEvents.has(event.id)){this.seenEvents.add(event.id);if(!this.reduced)this.effects.burst(event.x,event.z,event.type==='elimination');}if(this.seenEvents.size>2000)this.seenEvents=new Set(state.events.map(e=>e.id));
+      for(const event of state.events)if(!this.seenEvents.has(event.id)){this.seenEvents.add(event.id);if(!this.reduced)this.effects.burst(event.x,event.z,event.type==='elimination'||event.type==='explosion');}if(this.seenEvents.size>2000)this.seenEvents=new Set(state.events.map(e=>e.id));
       this.effects.sync(state.projectiles);
     } else {
       for(const r of this.robots.values())r.group.visible=false;this.effects.clear();

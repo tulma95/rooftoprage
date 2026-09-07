@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { botInput } from '../server/bots.js';
 import { Simulation } from '../server/simulation.js';
-import { EMPTY_INPUT, makePlayer, validInput } from '../shared/game.js';
+import { ARENA_HALF, EMPTY_INPUT, makePlayer, validInput } from '../shared/game.js';
 
 function pair() {
   const bot = makePlayer('bot', 'Rivet', 'ram', 'cannon', 0);
@@ -31,7 +31,7 @@ test('bots aim, approach, and fire only at live opponents in their forward arc',
 
 test('bots stop driving outward at the edge and steer toward the center', () => {
   const { bot, human } = pair();
-  bot.z = 20; human.z = 21;
+  bot.z = ARENA_HALF - 2; human.z = ARENA_HALF - 1;
   let input = botInput(bot, [bot, human]);
   assert.equal(input.forward, 0); assert.notEqual(input.turn, 0); assert.equal(input.top, false);
   bot.yaw = Math.PI;

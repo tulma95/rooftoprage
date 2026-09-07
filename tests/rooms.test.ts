@@ -170,3 +170,23 @@ test('one human can launch bot practice; bots load, fight, and do not keep an em
   await leave(host); await delay(150);
   await assert.rejects(new Client(endpoint).joinById(host.roomId, options));
 });
+
+test('chassis selection synchronizes, clears ready, and stays locked through combat', async () => {
+  const host = observe(await new Client(endpoint).create('arena', { ...options, chassis: 'dart' }));
+  const guest = await join(host.roomId, { chassis: 'bulwark' });
+  await until(() => state(guest)?.players.length === 2);
+  assert.deepEqual(state(guest).players.map(p => [p.chassis, p.hp]), [['dart', 70], ['bulwark', 170]]);
+  host.send('ready', true); await until(() => state(guest).players[0]!.ready);
+  host.send('equipment', { ...options, chassis: 'bruiser' });
+  await until(() => state(guest).players[0]!.chassis === 'bruiser' && !state(guest).players[0]!.ready);
+  assert.equal(state(guest).players[0]!.hp, 130);
+  host.send('equipment', { ...options, chassis: '__proto__' }); await delay(100);
+  assert.equal(state(guest).players[0]!.chassis, 'bruiser');
+  host.send('ready', true); guest.send('ready', true); await until(() => state(host).players.every(p => p.ready));
+  host.send('start'); await until(() => state(guest).phase === 'loading');
+  host.send('loaded'); guest.send('loaded'); await until(() => state(guest).phase === 'combat');
+  host.send('equipment', { ...options, chassis: 'dart' }); await delay(100);
+  assert.equal(state(guest).players[0]!.chassis, 'bruiser');
+  assert.equal(state(guest).players[0]!.hp, 130);
+  await leave(host); await leave(guest);
+});
