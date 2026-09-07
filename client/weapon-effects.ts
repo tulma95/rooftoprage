@@ -7,17 +7,30 @@ const MAX_SPARKS = 256;
 export class WeaponEffects {
   readonly sparks = new THREE.InstancedMesh(
     new THREE.IcosahedronGeometry(1, 0),
-    new THREE.MeshBasicMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
+    new THREE.MeshBasicMaterial({
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
     MAX_SPARKS,
   );
   private particles = Array.from({ length: MAX_SPARKS }, () => ({
-    position: new THREE.Vector3(), velocity: new THREE.Vector3(), life: 0, max: 1, size: 0, color: new THREE.Color(),
+    position: new THREE.Vector3(),
+    velocity: new THREE.Vector3(),
+    life: 0,
+    max: 1,
+    size: 0,
+    color: new THREE.Color(),
   }));
   private active = 0;
   private transform = new THREE.Object3D();
   private color = new THREE.Color();
   private projectiles = new Map<number, THREE.Mesh>();
-  private pools: Record<ProjectileWeapon, THREE.Mesh[]> = { cannon: [], scattergun: [], railgun: [] };
+  private pools: Record<ProjectileWeapon, THREE.Mesh[]> = {
+    cannon: [],
+    scattergun: [],
+    railgun: [],
+  };
   private ids = new Set<number>();
 
   constructor(private scene: THREE.Scene) {
@@ -29,9 +42,14 @@ export class WeaponEffects {
     this.sparks.instanceColor!.setUsage(THREE.DynamicDrawUsage);
     scene.add(this.sparks);
     for (const weapon of Object.keys(this.pools) as ProjectileWeapon[]) {
-      const rail = weapon === 'railgun', pellet = weapon === 'scattergun';
-      const geometry = rail ? new THREE.BoxGeometry(.12, .12, 1.9) : new THREE.SphereGeometry(pellet ? .085 : .16, 6, 6);
-      const material = new THREE.MeshBasicMaterial({ color: rail ? '#76f3ff' : pellet ? '#ff9e45' : '#ffda79' });
+      const rail = weapon === 'railgun',
+        pellet = weapon === 'scattergun';
+      const geometry = rail
+        ? new THREE.BoxGeometry(0.12, 0.12, 1.9)
+        : new THREE.SphereGeometry(pellet ? 0.085 : 0.16, 6, 6);
+      const material = new THREE.MeshBasicMaterial({
+        color: rail ? '#76f3ff' : pellet ? '#ff9e45' : '#ffda79',
+      });
       // Four pilots, including two overlapping cannon volleys at maximum range.
       const capacity = 4 * PROJECTILE_RULES[weapon].angles.length * (weapon === 'cannon' ? 2 : 1);
       for (let i = 0; i < capacity; i++) {
@@ -47,10 +65,14 @@ export class WeaponEffects {
   burst(x: number, z: number, big: boolean): void {
     for (let i = 0; i < (big ? 22 : 9) && this.active < MAX_SPARKS; i++) {
       const particle = this.particles[this.active++]!;
-      particle.position.set(x, .8, z);
-      particle.velocity.set((Math.random() - .5) * 9, Math.random() * 6, (Math.random() - .5) * 9);
-      particle.life = particle.max = .3 + Math.random() * (big ? .8 : .4);
-      particle.size = big ? .16 : .065;
+      particle.position.set(x, 0.8, z);
+      particle.velocity.set(
+        (Math.random() - 0.5) * 9,
+        Math.random() * 6,
+        (Math.random() - 0.5) * 9,
+      );
+      particle.life = particle.max = 0.3 + Math.random() * (big ? 0.8 : 0.4);
+      particle.size = big ? 0.16 : 0.065;
       particle.color.set(i % 2 ? '#ffc456' : '#ff642e');
     }
   }
@@ -97,7 +119,10 @@ export class WeaponEffects {
       this.transform.scale.setScalar(particle.size);
       this.transform.updateMatrix();
       this.sparks.setMatrixAt(i, this.transform.matrix);
-      this.sparks.setColorAt(i, this.color.copy(particle.color).multiplyScalar(particle.life / particle.max));
+      this.sparks.setColorAt(
+        i,
+        this.color.copy(particle.color).multiplyScalar(particle.life / particle.max),
+      );
       i++;
     }
     this.sparks.count = this.active;

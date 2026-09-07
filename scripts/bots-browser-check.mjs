@@ -4,7 +4,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
+  page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(process.env.BROWSER_URL || 'http://localhost:5173');
   await page.locator('#nickname').fill('Solo Pilot');
   await page.locator('#name-form button').click();
@@ -30,5 +30,9 @@ try {
   await page.getByRole('button', { name: 'Leave match', exact: true }).last().click();
   await expect(page.getByRole('button', { name: 'Play with bots', exact: true })).toBeVisible();
   assert.deepEqual(errors, []);
-  console.log('Solo practice: three bots, combat, results, rematch, and leaving pass with no browser errors.');
-} finally { await browser.close(); }
+  console.log(
+    'Solo practice: three bots, combat, results, rematch, and leaving pass with no browser errors.',
+  );
+} finally {
+  await browser.close();
+}

@@ -7,21 +7,9 @@
     "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "lib": [
-      "ES2022",
-      "DOM"
-    ],
-    "types": [
-      "node",
-      "vite/client"
-    ],
+    "lib": ["ES2022", "DOM"],
+    "types": ["node", "vite/client"],
     "outDir": "dist-server"
   },
-  "include": [
-    "client",
-    "server",
-    "shared",
-    "tests",
-    "vite.config.ts"
-  ]
+  "include": ["client", "server", "shared", "tests", "vite.config.ts"]
 }

@@ -4,12 +4,15 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
   const page = await browser.newPage();
   const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
+  page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(() => {
     const Original = window.AudioContext;
     window.__audio = [];
     window.AudioContext = class extends Original {
-      constructor(...args) { super(...args); window.__audio.push(this); }
+      constructor(...args) {
+        super(...args);
+        window.__audio.push(this);
+      }
     };
   });
   await page.goto(process.env.BROWSER_URL || 'http://localhost:6173');
@@ -22,7 +25,10 @@ try {
   const music = page.getByRole('checkbox', { name: 'Synthwave music' });
   await music.uncheck();
   await page.waitForFunction(() => window.__audio[0]?.state === 'suspended');
-  assert.equal(await page.getByRole('checkbox', { name: 'Sound effects', exact: true }).isChecked(), true);
+  assert.equal(
+    await page.getByRole('checkbox', { name: 'Sound effects', exact: true }).isChecked(),
+    true,
+  );
   await page.reload();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   assert.equal(await music.isChecked(), false, 'Mute persisted');
@@ -31,7 +37,7 @@ try {
   await page.waitForFunction(() => window.__audio[0]?.state === 'running');
   const before = await page.evaluate(() => window.__audio[0].currentTime);
   await page.waitForTimeout(1200);
-  assert.ok(await page.evaluate(() => window.__audio[0].currentTime) > before + 0.5);
+  assert.ok((await page.evaluate(() => window.__audio[0].currentTime)) > before + 0.5);
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, value: true });
     document.dispatchEvent(new Event('visibilitychange'));
@@ -42,7 +48,15 @@ try {
     document.dispatchEvent(new Event('visibilitychange'));
   });
   await page.waitForFunction(() => window.__audio[0]?.state === 'running');
-  assert.equal(await page.evaluate(() => window.__audio.length), 1, 'One music context after resume');
+  assert.equal(
+    await page.evaluate(() => window.__audio.length),
+    1,
+    'One music context after resume',
+  );
   assert.deepEqual(errors, []);
-  console.log('Music checks passed: gesture start, independent mute, saved preference, playback clock, visibility pause/resume, no browser errors.');
-} finally { await browser.close(); }
+  console.log(
+    'Music checks passed: gesture start, independent mute, saved preference, playback clock, visibility pause/resume, no browser errors.',
+  );
+} finally {
+  await browser.close();
+}

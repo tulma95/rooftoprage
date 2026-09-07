@@ -10,7 +10,9 @@
     "start": "node dist-server/server/index.js",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
-    "test:browser": "node scripts/browser-check.mjs"
+    "test:browser": "node scripts/browser-check.mjs",
+    "format": "prettier --write \"{client,server,shared,tests}/**/*.ts\" \"client/**/*.css\" \"scripts/*.mjs\" \"*.{json,ts}\"",
+    "format:check": "prettier --check \"{client,server,shared,tests}/**/*.ts\" \"client/**/*.css\" \"scripts/*.mjs\" \"*.{json,ts}\""
   },
   "dependencies": {
     "@colyseus/core": "0.18.11",
@@ -23,6 +25,7 @@
     "@types/express": "5.0.6",
     "@types/node": "26.5.0",
     "@types/three": "0.185.4",
+    "prettier": "3.9.6",
     "three": "0.185.1",
     "tsx": "4.23.13",
     "typescript": "7.0.2",
