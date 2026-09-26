@@ -5,6 +5,7 @@ import { driveTerrain } from '../shared/hazards.js';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { WeaponEffects } from './weapon-effects.js';
+import { WowEffects } from './wow-effects.js';
 import {
   ARENA_HALF,
   EMPTY_INPUT,
@@ -448,6 +449,7 @@ export class GameScene {
   private city = new City();
   private hazards = new ArenaHazards();
   private effects: WeaponEffects;
+  private wow: WowEffects;
   private finale: Finale;
   private seenEvents = new Set<number>();
   private target = new THREE.Vector3();
@@ -487,6 +489,7 @@ export class GameScene {
     sun.shadow.bias = -0.0006;
     this.scene.add(sun);
     this.effects = new WeaponEffects(this.scene);
+    this.wow = new WowEffects(this.scene);
     this.finale = new Finale(this.scene);
     this.buildArena();
     this.scene.add(this.city.group);
@@ -556,6 +559,7 @@ export class GameScene {
       if (state?.code !== this.priorState?.code || state?.round !== this.priorState?.round) {
         this.seenEvents.clear();
         this.effects.clear();
+        this.wow.clear();
         this.shake = 0;
       }
       if (
@@ -837,6 +841,11 @@ export class GameScene {
               yaw,
               event.melee,
             );
+            this.wow.melee(
+              b.x - ((b.x - a.x) / distance) * 0.85,
+              b.z - ((b.z - a.z) / distance) * 0.85,
+              event.melee,
+            );
             if (watched && !grinding) {
               const proximity = Math.max(
                 0,
@@ -867,6 +876,7 @@ export class GameScene {
               event.z,
               event.type === 'elimination' || event.type === 'explosion',
             );
+            this.wow.impact(event.x, event.z, event.type);
           }
         }
       if (this.seenEvents.size > 2000) this.seenEvents = new Set(state.events.map((e) => e.id));
@@ -876,6 +886,7 @@ export class GameScene {
       for (const r of this.robots.values()) this.removeRobot(r);
       this.robots.clear();
       this.effects.clear();
+      this.wow.clear();
       this.previewRobot.group.rotation.y = -0.65 + Math.sin(time * 0.22) * 0.16;
       // Shift the preview into the right quarter, keeping long attachments clear of the garage cards.
       this.camera.setViewOffset(width, height, -width * 0.3, 0, width, height);
@@ -891,6 +902,7 @@ export class GameScene {
     );
     if (this.finale.active) this.aim = null;
     this.effects.step(dt);
+    this.wow.step(dt);
     this.shake *= Math.exp(-dt * 13);
     this.camera.lookAt(this.target);
     // Offset only the rendered view, avoiding drift in the follow-camera position.
