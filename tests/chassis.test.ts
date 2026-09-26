@@ -6,6 +6,7 @@ import {
   EMPTY_INPUT,
   drive,
   makePlayer,
+  robotRadius,
   validEquipment,
   type Chassis,
 } from '../shared/game.js';
@@ -61,4 +62,27 @@ test('loadout validation accepts legacy defaults and rejects forged chassis', ()
   for (const chassis of Object.keys(CHASSIS)) assert.ok(validEquipment({ ...equipment, chassis }));
   for (const chassis of ['unknown', 'constructor', '__proto__', null, {}, 2])
     assert.equal(validEquipment({ ...equipment, chassis }), false);
+});
+
+test('weaker chassis have smaller hitboxes, so a near miss grazes a Bulwark but not a Dart', () => {
+  const keys: Chassis[] = ['dart', 'mule', 'bruiser', 'bulwark'];
+  for (let i = 1; i < keys.length; i++)
+    assert.ok(robotRadius(keys[i - 1]!) < robotRadius(keys[i]!));
+  function grazed(target: Chassis) {
+    const sim = new Simulation();
+    sim.state.players = [
+      makePlayer('a', 'Shooter', 'ram', 'cannon', 0),
+      makePlayer('b', 'Target', 'ram', 'cannon', 1, target),
+    ];
+    sim.start();
+    sim.state.phase = 'combat';
+    Object.assign(sim.state.players[0]!, { x: 0, z: 0, yaw: 0 });
+    Object.assign(sim.state.players[1]!, { x: 1, z: 6, yaw: 0 });
+    sim.inputs.set('a', { input: { ...EMPTY_INPUT, top: true }, time: sim.time });
+    sim.step(0.1);
+    sim.step(0.2);
+    return sim.state.players[1]!.hp < CHASSIS[target].hp;
+  }
+  assert.equal(grazed('dart'), false);
+  assert.equal(grazed('bulwark'), true);
 });

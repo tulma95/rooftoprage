@@ -6,6 +6,7 @@ import {
   EMPTY_INPUT,
   drive,
   makePlayer,
+  robotRadius,
   type Chassis,
   type FrontWeapon,
   type Input,
@@ -20,8 +21,13 @@ function match(front: FrontWeapon = 'saw', attacker: Chassis = 'mule', target: C
   sim.start();
   sim.state.phase = 'combat';
   Object.assign(sim.state.players[0]!, { x: 0, z: 0, yaw: 0 });
-  Object.assign(sim.state.players[1]!, { x: 0, z: 2.15, yaw: 0 });
+  Object.assign(sim.state.players[1]!, { x: 0, z: contact(attacker, target) + 0.05, yaw: 0 });
   return sim;
+}
+
+/** Center distance at which two hulls just touch. */
+function contact(a: Chassis = 'mule', b: Chassis = 'mule') {
+  return robotRadius(a) + robotRadius(b);
 }
 
 function input(sim: Simulation, id: string, values: Partial<Input>) {
@@ -83,7 +89,7 @@ test('collision speed and mass determine shove and the attacker recoils', () => 
   function impact(speed: number, attacker: Chassis = 'mule', target: Chassis = 'mule') {
     const sim = match('saw', attacker, target);
     // Begin just touching so slow and fast runs both make contact in this tick.
-    sim.state.players[1]!.z = 2.1;
+    sim.state.players[1]!.z = contact(attacker, target);
     input(sim, 'a', { forward: speed });
     sim.step(0.01);
     return sim.state.players;
@@ -190,7 +196,7 @@ test('side and rear rams hit harder than frontal armor, independent of roster or
   function impact(yaw: number, reversed = false, piston = false) {
     const sim = match('ram');
     const [a, b] = sim.state.players;
-    Object.assign(b!, { yaw, z: piston ? 2.5 : 2.1 });
+    Object.assign(b!, { yaw, z: contact() + (piston ? 0.4 : 0) });
     if (reversed) sim.state.players.reverse();
     input(sim, 'a', piston ? { front: true } : { forward: 1 });
     sim.step(0.01);

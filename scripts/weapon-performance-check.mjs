@@ -44,9 +44,9 @@ try {
         yaw: 0,
       }));
       for (let i = 0; i < 4; i++) {
-        game.effects.shot(i * 3 - 4, 0, 0, players[i].top);
+        game.effects.shot(i * 3 - 4, 1.4, 0, 0, players[i].top);
         game.effects.impact(i * 3 - 4, 5, i === 0);
-        game.effects.flame(5, 0, 0, 1 / 60);
+        game.effects.flame(5, 1.4, 0, 0, 1 / 60);
       }
       game.effects.step(1 / 60);
       game.frame();
@@ -68,8 +68,8 @@ try {
   });
   await page.evaluate(() => {
     const game = window.weaponEffectsGame;
-    game.effects.shot(-4, 0, 0, 'cannon');
-    game.effects.shot(2, 0, 0, 'railgun');
+    game.effects.shot(-4, 1.4, 0, 0, 'cannon');
+    game.effects.shot(2, 1.4, 0, 0, 'railgun');
     game.effects.impact(-1, 4, true);
     game.effects.step(0.08);
     game.renderer.render(game.scene, game.camera);

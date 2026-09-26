@@ -82,7 +82,7 @@ test('weapon flashes, shockwaves, flame and trails reuse the bounded particle ba
   const effects = new WeaponEffects(scene);
   const children = [...scene.children];
   for (const weapon of ['cannon', 'scattergun', 'railgun', 'flamethrower'] as const) {
-    effects.shot(0, 0, Math.PI / 2, weapon);
+    effects.shot(0, 1.4, 0, Math.PI / 2, weapon);
     effects.step(0);
     assert.ok(effects.sparks.count >= 36);
     effects.clear();
@@ -95,7 +95,7 @@ test('weapon flashes, shockwaves, flame and trails reuse the bounded particle ba
   assert.equal(effects.sparks.count, 0);
   for (let i = 0; i < 100; i++) {
     effects.impact(0, 0, true);
-    effects.flame(0, 0, 0, 1 / 30);
+    effects.flame(0, 1.4, 0, 0, 1 / 30);
     effects.step(1 / 30);
     assert.ok(effects.sparks.count <= 256);
   }

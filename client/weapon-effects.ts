@@ -72,10 +72,10 @@ export class WeaponEffects {
     }
   }
 
-  burst(x: number, z: number, big: boolean): void {
+  burst(x: number, z: number, big: boolean, y = 0.8): void {
     for (let i = 0; i < (big ? 22 : 9) && this.active < MAX_SPARKS; i++) {
       const particle = this.particles[this.active++]!;
-      particle.position.set(x, 0.8, z);
+      particle.position.set(x, y, z);
       particle.velocity.set(
         (Math.random() - 0.5) * 9,
         Math.random() * 6,
@@ -114,18 +114,16 @@ export class WeaponEffects {
     p.stretch = stretch;
   }
 
-  shot(x: number, z: number, yaw: number, weapon: TopWeapon): void {
+  /** Muzzle flash at the barrel tip (world position). */
+  shot(x: number, y: number, z: number, yaw: number, weapon: TopWeapon): void {
     const rail = weapon === 'railgun';
     const spread = weapon === 'scattergun' ? 1.2 : 0.45;
-    const muzzle = rail ? 1.65 : 1.2;
-    x += Math.sin(yaw) * muzzle;
-    z += Math.cos(yaw) * muzzle;
     for (let i = 0; i < (rail ? 12 : 18); i++) {
       const angle = yaw + (Math.random() - 0.5) * spread;
       const speed = 4 + Math.random() * 10;
       this.emit(
         x,
-        1.4,
+        y,
         z,
         Math.sin(angle) * speed,
         (Math.random() - 0.5) * 3,
@@ -137,7 +135,7 @@ export class WeaponEffects {
         3,
       );
     }
-    this.ring(x, 1.4, z, rail ? '#65eaff' : '#ffb84c', 2.5, yaw);
+    this.ring(x, y, z, rail ? '#65eaff' : '#ffb84c', 2.5, yaw);
   }
 
   private ring(x: number, y: number, z: number, color: string, speed: number, yaw?: number): void {
@@ -159,24 +157,26 @@ export class WeaponEffects {
     }
   }
 
-  impact(x: number, z: number, big: boolean): void {
+  /** `y` is the struck body's center height; smaller chassis are hit lower. */
+  impact(x: number, z: number, big: boolean, y = 1): void {
     this.ring(x, 0.12, z, big ? '#ff7b32' : '#ffe4a0', big ? 13 : 6);
-    this.burst(x, z, big);
+    this.burst(x, z, big, y - 0.2);
   }
 
-  melee(x: number, z: number, yaw: number, weapon: FrontWeapon): void {
+  /** `y` is the attachment's contact height. */
+  melee(x: number, z: number, yaw: number, weapon: FrontWeapon, y = 0.95): void {
     const grinding = weapon === 'saw' || weapon === 'drill' || weapon === 'wedge';
     const heavy = weapon === 'hammer';
     const color = weapon === 'hook' ? '#96edff' : weapon === 'flipper' ? '#caff98' : '#ffd178';
     // A compact white contact star reads before the longer directional sparks.
-    this.emit(x, 0.95, z, 0, 0, 0, '#fff8df', grinding ? 0.18 : 0.36, 0.075);
+    this.emit(x, y, z, 0, 0, 0, '#fff8df', grinding ? 0.18 : 0.36, 0.075);
     const direction = yaw + (weapon === 'sweeper' ? Math.PI / 2 : weapon === 'hook' ? Math.PI : 0);
     for (let i = 0; i < (grinding ? 8 : heavy ? 26 : 18); i++) {
       const angle = direction + (Math.random() - 0.5) * (grinding ? 1.9 : 1.1);
       const speed = 3 + Math.random() * (heavy ? 11 : 7);
       this.emit(
         x,
-        0.85,
+        y - 0.1,
         z,
         Math.sin(angle) * speed,
         weapon === 'flipper' ? 6 + Math.random() * 5 : Math.random() * (heavy ? 7 : 3),
@@ -196,15 +196,16 @@ export class WeaponEffects {
     this.emit(x, y, z, 0, 0.15, 0, weapon === 'hook' ? '#96edff' : '#ffe6ab', 0.1, 0.12);
   }
 
-  flame(x: number, z: number, yaw: number, dt: number): void {
+  /** Flame stream from the nozzle tip (world position). */
+  flame(x: number, y: number, z: number, yaw: number, dt: number): void {
     // Expected emission rate is independent of the display refresh rate.
     const count = Math.floor(dt * 75) + (Math.random() < (dt * 75) % 1 ? 1 : 0);
     for (let i = 0; i < count; i++) {
       const angle = yaw + (Math.random() - 0.5) * 0.35;
       this.emit(
-        x + Math.sin(yaw) * 1.4,
-        1.4,
-        z + Math.cos(yaw) * 1.4,
+        x,
+        y,
+        z,
         Math.sin(angle) * 8,
         0.5 + Math.random(),
         Math.cos(angle) * 8,
@@ -217,7 +218,8 @@ export class WeaponEffects {
     }
   }
 
-  sync(projectiles: readonly Projectile[]): void {
+  /** `height` gives a new projectile's flight height from its owner, fixed for its lifetime. */
+  sync(projectiles: readonly Projectile[], height: (ownerId: string) => number = () => 1.35): void {
     this.ids.clear();
     for (const projectile of projectiles) this.ids.add(projectile.id);
     for (const [id, mesh] of this.projectiles) {
@@ -232,9 +234,10 @@ export class WeaponEffects {
         mesh = this.pools[projectile.weapon].pop();
         if (!mesh) continue;
         this.projectiles.set(projectile.id, mesh);
+        mesh.position.y = height(projectile.ownerId);
       }
       mesh.visible = true;
-      mesh.position.set(projectile.x, 1.35, projectile.z);
+      mesh.position.set(projectile.x, mesh.position.y, projectile.z);
       mesh.rotation.y = projectile.yaw;
     }
   }
@@ -256,7 +259,7 @@ export class WeaponEffects {
           const offset = (i / 5) * length;
           this.emit(
             mesh.position.x - Math.sin(mesh.rotation.y) * offset,
-            1.35,
+            mesh.position.y,
             mesh.position.z - Math.cos(mesh.rotation.y) * offset,
             -Math.sin(mesh.rotation.y) * 0.3,
             0,

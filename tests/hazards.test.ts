@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Simulation } from '../server/simulation.js';
-import { EMPTY_INPUT, makePlayer } from '../shared/game.js';
-import { driveTerrain, COOLING_POOLS, OIL_SLICKS } from '../shared/hazards.js';
+import { EMPTY_INPUT, makePlayer, robotRadius } from '../shared/game.js';
+import { HAZARD_RULES, driveTerrain, COOLING_POOLS, OIL_SLICKS } from '../shared/hazards.js';
 function match() {
   const sim = new Simulation();
   sim.state.players = [
@@ -93,7 +93,10 @@ test('tanks stop robots and self-inflicted fire grants no score', () => {
     tank = sim.state.tanks[0]!;
   Object.assign(p, { x: tank.x, z: tank.z });
   sim.step(0.05);
-  assert.ok(Math.hypot(p.x - tank.x, p.z - tank.z) >= 1.95 - 1e-9);
+  assert.ok(
+    Math.hypot(p.x - tank.x, p.z - tank.z) >=
+      robotRadius(p.chassis) + HAZARD_RULES.tankRadius - 1e-9,
+  );
   Object.assign(p, { x: 0, z: 0, hp: 0.1, burning: 1, burnAttackerId: p.id });
   sim.step(0.05);
   assert.equal(p.alive, false);

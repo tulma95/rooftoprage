@@ -8,6 +8,7 @@ import { WeaponEffects } from './weapon-effects.js';
 import { WowEffects } from './wow-effects.js';
 import {
   ARENA_HALF,
+  chassisScale,
   EMPTY_INPUT,
   TICK_SECONDS,
   type Chassis,
@@ -26,6 +27,7 @@ interface Robot {
   group: THREE.Group;
   suspension: THREE.Group;
   wheels: THREE.Mesh[];
+  wheelRadius: number;
   saw?: THREE.Group;
   hammer?: THREE.Group;
   drill?: THREE.Group;
@@ -33,6 +35,7 @@ interface Robot {
   flipper?: THREE.Group;
   hook?: THREE.Group;
   barrel: THREE.Group;
+  muzzle: THREE.Object3D;
   burn: THREE.Group;
   flame: THREE.Group;
   front: FrontWeapon;
@@ -57,6 +60,13 @@ const silver = new THREE.MeshStandardMaterial({
   metalness: 0.85,
 });
 const rubber = new THREE.MeshStandardMaterial({ color: '#101412', roughness: 1 });
+const glass = new THREE.MeshStandardMaterial({ color: '#1c2b33', roughness: 0.12, metalness: 0.9 });
+const stripe = new THREE.MeshStandardMaterial({ color: '#ece8dc', roughness: 0.55 });
+const tail = new THREE.MeshStandardMaterial({
+  color: '#c42a1c',
+  emissive: '#a3150b',
+  emissiveIntensity: 1.4,
+});
 function box(
   parent: THREE.Object3D,
   x: number,
@@ -92,6 +102,46 @@ function cylinder(
   m.castShadow = true;
   parent.add(m);
   return m;
+}
+/** Tire with rim and spokes (and tread lugs when knobby) parented so they spin together. */
+function wheel(
+  parent: THREE.Object3D,
+  x: number,
+  z: number,
+  r: number,
+  w: number,
+  knobby: boolean,
+): THREE.Mesh {
+  const tire = cylinder(parent, x, r, z, r, w, rubber, 'x', 20);
+  const face = -Math.sign(x) * (w / 2 + 0.01); // Tire local +y points to world -x.
+  const rim: THREE.BufferGeometry[] = [
+    new THREE.CylinderGeometry(r * 0.62, r * 0.62, w + 0.01, 16),
+  ];
+  const trim: THREE.BufferGeometry[] = [
+    new THREE.CylinderGeometry(r * 0.16, r * 0.16, w + 0.08, 8),
+  ];
+  for (let i = 0; i < 5; i++)
+    trim.push(
+      new THREE.BoxGeometry(r * 0.11, 0.03, r * 0.52)
+        .translate(0, face, r * 0.3)
+        .rotateY((i * Math.PI * 2) / 5),
+    );
+  const lugs: THREE.BufferGeometry[] = [];
+  if (knobby)
+    for (let i = 0; i < 14; i++)
+      lugs.push(
+        new THREE.BoxGeometry(0.13, w * 0.92, 0.1).translate(0, 0, r).rotateY((i * Math.PI) / 7),
+      );
+  for (const [geometries, material] of [
+    [rim, steel],
+    [trim, silver],
+    [lugs, rubber],
+  ] as const) {
+    if (!geometries.length) continue;
+    tire.add(new THREE.Mesh(mergeGeometries(geometries), material));
+    for (const g of geometries) g.dispose();
+  }
+  return tire;
 }
 /** One draw call for many static [x, y, z, w, h, d] boxes that never cast visible shadows. */
 function instancedBoxes(parent: THREE.Object3D, material: THREE.Material, boxes: number[][]): void {
@@ -144,50 +194,99 @@ function robot(
       emissive: '#f5ca63',
       emissiveIntensity: 2,
     });
-  box(group, 0, 0.62, 0, 1.75, 0.48, 2.35, steel);
-  box(group, 0, 0.95, -0.12, 1.62, 0.34, 1.65, paint);
-  const hood = box(group, 0, 1.09, 0.49, 1.4, 0.13, 0.65, paint);
-  hood.rotation.x = -0.18;
-  box(group, 0, 0.9, -1.05, 1.56, 0.3, 0.16, dark);
-  for (const x of [-0.68, 0.68]) {
-    box(group, x, 1.145, -0.35, 0.085, 0.035, 0.9, silver);
-    for (const z of [-0.82, 0.73]) cylinder(group, x, 1.16, z, 0.055, 0.04, silver);
-  }
-  for (let i = 0; i < 5; i++) box(group, -0.34 + i * 0.17, 1.135, -0.55, 0.075, 0.025, 0.36, dark);
-  group.add(runningGear);
   const wheels: THREE.Mesh[] = [];
-  for (const x of [-1, 1])
-    for (const z of [-0.78, 0.78]) {
-      const wheel = cylinder(runningGear, x, 0.45, z, 0.46, 0.36, rubber, 'x', 16);
-      wheels.push(wheel);
-      cylinder(runningGear, x * 1.19, 0.45, z, 0.25, 0.045, steel, 'x');
-      cylinder(runningGear, x * 1.22, 0.45, z, 0.095, 0.05, paint, 'x');
-      box(group, x, 0.94, z, 0.45, 0.12, 0.95, paint);
+  let wheelRadius = 0.46,
+    turretY = 1.17;
+  const axles = (r: number, w: number, x: number, zs: number[], knobby = false) => {
+    wheelRadius = r;
+    for (const side of [-1, 1])
+      for (const z of zs) wheels.push(wheel(runningGear, side * x, z, r, w, knobby));
+  };
+  group.add(runningGear);
+  // Each chassis is its own vehicle, but keeps the turret seat (y ~1.12, z -0.13) and front mounts.
+  if (chassis === 'mule') {
+    // Utility pickup: long hood, cab, open bed.
+    axles(0.46, 0.36, 1, [-0.78, 0.78]);
+    box(group, 0, 0.6, 0, 1.7, 0.36, 2.4, steel);
+    box(group, 0, 0.9, 0.72, 1.66, 0.3, 0.95, paint);
+    box(group, 0, 0.95, -0.12, 1.66, 0.34, 0.8, paint);
+    for (const x of [-0.835, 0.835]) {
+      box(group, x, 1.0, -0.12, 0.02, 0.15, 0.62, glass);
+      box(group, x * 1.08, 1.02, 0.3, 0.14, 0.1, 0.05, dark);
+      box(group, x * 0.94, 0.95, -0.85, 0.08, 0.3, 0.7, paint);
+      box(group, x * 0.86, 0.9, 1.21, 0.24, 0.1, 0.03, lamp);
+      box(group, x * 0.88, 0.95, -1.22, 0.1, 0.18, 0.03, tail);
+      for (const z of [-0.78, 0.78]) box(group, x * 1.2, 0.94, z, 0.45, 0.12, 0.95, paint);
     }
-  for (const x of [-0.57, 0.57]) box(group, x, 0.79, 1.2, 0.25, 0.11, 0.035, lamp);
-  cylinder(group, -0.61, 1.26, -0.85, 0.09, 0.65, dark);
-  cylinder(group, -0.61, 1.6, -0.85, 0.13, 0.07, silver);
-  // Keep attachment positions and collision footprint consistent across chassis.
-  if (chassis === 'dart') {
-    for (const x of [-0.7, 0.7]) {
-      box(group, x, 1.17, -0.85, 0.12, 0.22, 0.65, silver);
-      box(group, x, 0.7, -1.3, 0.18, 0.18, 0.55, dark);
-    }
-    box(group, 0, 1.35, -0.95, 1.8, 0.08, 0.32, paint);
-  } else if (chassis === 'bruiser') {
-    for (const x of [-0.84, 0.84]) {
-      box(group, x, 0.94, 0, 0.2, 0.55, 1.8, paint);
-      for (const z of [-0.6, 0, 0.6]) box(group, x * 1.15, 1.03, z, 0.08, 0.3, 0.16, silver);
-    }
-    box(group, 0, 1.2, -0.55, 1.35, 0.22, 0.6, steel);
-  } else if (chassis === 'bulwark') {
+    box(group, 0, 1.0, 0.29, 1.5, 0.15, 0.02, glass);
+    box(group, 0, 0.82, -0.85, 1.62, 0.06, 0.7, dark);
+    box(group, 0, 0.95, -1.2, 1.62, 0.3, 0.06, paint);
+    box(group, 0, 0.86, 1.2, 1.0, 0.2, 0.04, dark);
+    for (const z of [-1.22, 1.22]) box(group, 0, 0.62, z, 1.8, 0.14, 0.1, silver);
+    box(group, 0.4, 0.97, -0.95, 0.34, 0.24, 0.22, steel);
+    cylinder(group, -0.72, 1.2, -0.5, 0.06, 0.55, silver);
+  } else if (chassis === 'dart') {
+    // Low sports car: wide stance, glass canopy, rear wing; turret sits lower.
+    turretY = 0.98;
+    axles(0.38, 0.42, 0.98, [-0.8, 0.82]);
+    box(group, 0, 0.4, 0, 1.8, 0.16, 2.4, dark);
+    box(group, 0, 0.6, -0.1, 1.88, 0.26, 2.2, paint);
+    const nose = box(group, 0, 0.58, 0.95, 1.8, 0.2, 0.6, paint);
+    nose.rotation.x = 0.12;
+    box(group, 0, 0.82, -0.15, 1.4, 0.2, 1.1, glass);
+    box(group, 0, 0.93, -0.2, 1.32, 0.06, 0.7, paint);
+    box(group, 0, 0.36, 1.2, 1.95, 0.04, 0.3, dark);
+    box(group, 0, 1.0, -1.1, 1.9, 0.04, 0.34, paint);
+    box(group, 0, 0.68, -1.21, 1.5, 0.06, 0.03, tail);
     for (const x of [-1, 1]) {
-      box(runningGear, x, 0.48, 0, 0.4, 0.7, 2.4, rubber);
-      box(group, x, 0.93, 0, 0.44, 0.2, 2.5, paint);
-      for (let z = -1; z <= 1; z += 0.25) box(runningGear, x, 0.12, z, 0.42, 0.08, 0.1, silver);
+      box(group, x * 0.16, 0.69, 0.95, 0.14, 0.01, 0.6, stripe).rotation.x = 0.12;
+      box(group, x * 0.95, 0.44, 0, 0.1, 0.12, 1.1, dark);
+      box(group, x * 0.55, 0.85, -1.08, 0.06, 0.3, 0.12, dark);
+      box(group, x * 0.95, 0.97, -1.1, 0.03, 0.18, 0.4, dark);
+      box(group, x * 0.62, 0.62, 1.22, 0.34, 0.06, 0.06, lamp);
+      cylinder(group, x * 0.3, 0.45, -1.22, 0.07, 0.2, silver, 'z');
+      for (const z of [-0.8, 0.82]) box(group, x * 0.94, 0.78, z, 0.5, 0.06, 0.9, paint);
     }
-    box(group, 0, 1.19, -0.52, 1.65, 0.3, 0.92, paint);
-    box(group, 0, 0.81, -1.2, 1.8, 0.65, 0.22, steel);
+  } else if (chassis === 'bruiser') {
+    // Lifted off-roader: tall knobby tires, flares, snorkel and spare; turret rides high.
+    turretY = 1.29;
+    axles(0.56, 0.48, 1.02, [-0.82, 0.82], true);
+    box(group, 0, 0.82, 0, 1.5, 0.2, 2.3, dark);
+    box(group, 0, 1.05, 0.05, 1.72, 0.34, 2.3, paint);
+    box(group, 0, 0.8, 1.24, 1.95, 0.2, 0.16, steel);
+    box(group, 0, 0.82, -1.2, 1.6, 0.16, 0.12, steel);
+    cylinder(group, 0, 1.05, -1.3, 0.38, 0.22, rubber, 'z', 16);
+    cylinder(group, 0, 1.05, -1.42, 0.2, 0.04, steel, 'z');
+    cylinder(group, 0.82, 1.35, 0.45, 0.06, 0.7, dark);
+    box(group, 0.82, 1.71, 0.5, 0.14, 0.1, 0.18, dark);
+    for (const x of [-1, 1]) {
+      box(group, x * 0.865, 1.12, -0.1, 0.02, 0.14, 0.9, glass);
+      box(group, x * 0.92, 0.66, 0, 0.2, 0.05, 0.45, silver);
+      cylinder(group, x * 0.6, 1.05, 1.2, 0.1, 0.04, lamp, 'z');
+      box(group, x * 0.75, 1.05, -1.21, 0.12, 0.14, 0.03, tail);
+      box(group, x * 1.02, 0.45, -1.42, 0.36, 0.4, 0.03, rubber);
+      for (const z of [-0.82, 0.82]) box(group, x * 0.95, 1.16, z, 0.4, 0.12, 1.22, dark);
+    }
+  } else {
+    // Six-wheeled armored carrier: slab hull, sloped glacis, smoke launchers.
+    axles(0.44, 0.42, 1.05, [-0.92, 0, 0.92], true);
+    box(group, 0, 0.6, 0, 1.6, 0.3, 2.6, dark);
+    box(group, 0, 0.88, -0.1, 1.95, 0.42, 2.3, paint);
+    box(group, 0, 0.8, 1.12, 1.95, 0.3, 0.5, paint).rotation.x = 0.5;
+    box(group, 0, 1.12, -0.3, 1.6, 0.06, 1.6, steel);
+    cylinder(group, 0.55, 1.17, -0.9, 0.2, 0.06, steel);
+    cylinder(group, -0.8, 1.6, -1.0, 0.012, 1.0, dark);
+    for (const x of [-1, 1]) {
+      box(group, x * 1.02, 1.0, 0, 0.14, 0.2, 2.6, steel);
+      box(group, x * 0.45, 1.0, 1.06, 0.3, 0.06, 0.02, glass);
+      box(group, x * 0.38, 0.88, -1.26, 0.7, 0.36, 0.03, steel);
+      box(group, x * 0.1, 0.9, -1.285, 0.04, 0.12, 0.03, silver);
+      box(group, x * 0.78, 0.98, 1.08, 0.16, 0.08, 0.04, lamp);
+      box(group, x * 0.85, 0.95, -1.26, 0.1, 0.1, 0.03, tail);
+      for (let i = 0; i < 3; i++)
+        cylinder(group, x * (0.62 + i * 0.1), 1.2, 0.75, 0.045, 0.22, dark, 'z').rotation.x =
+          Math.PI / 2 - 0.5;
+    }
   }
   let saw: THREE.Group | undefined, hammer: THREE.Group | undefined, drill: THREE.Group | undefined;
   let sweeper: THREE.Group | undefined,
@@ -321,7 +420,7 @@ function robot(
     drill.add(flight);
   }
   const barrel = new THREE.Group();
-  barrel.position.set(0, 1.17, -0.13);
+  barrel.position.set(0, turretY, -0.13);
   group.add(barrel);
   cylinder(barrel, 0, 0, 0, 0.43, 0.16, dark);
   if (top === 'cannon') {
@@ -373,8 +472,16 @@ function robot(
     }
     cylinder(barrel, 0, 0.26, -0.48, 0.22, 0.18, energy, 'z');
   }
+  // Barrel tip, so flashes and flames follow each chassis' turret height, scale and recoil.
+  const muzzle = new THREE.Object3D();
+  muzzle.position.set(
+    0,
+    top === 'railgun' ? 0.3 : 0.2,
+    { cannon: 1.33, flamethrower: 1.08, scattergun: 1.0, railgun: 1.52 }[top],
+  );
+  barrel.add(muzzle);
   const flame = new THREE.Group();
-  flame.position.set(0, 1.36, 1);
+  flame.position.set(0, turretY + 0.19, 1);
   group.add(flame);
   for (let i = 0; i < 7; i++) {
     const m = new THREE.Mesh(
@@ -401,12 +508,14 @@ function robot(
   mergeStatic(runningGear, wheels);
   for (const part of [saw, hammer, drill, sweeper, flipper, hook, barrel])
     if (part) mergeStatic(part);
+  group.scale.setScalar(chassisScale(chassis));
   return {
     suspension,
     chassis,
     group,
     burn,
     wheels,
+    wheelRadius,
     saw,
     hammer,
     drill,
@@ -414,6 +523,7 @@ function robot(
     flipper,
     hook,
     barrel,
+    muzzle,
     flame,
     front,
     top,
@@ -456,6 +566,7 @@ export class GameScene {
   private aim: THREE.Vector3 | null = null;
   // Scratch objects reused every frame to avoid garbage-collection hitches.
   private aimPoint = new THREE.Vector3();
+  private muzzlePoint = new THREE.Vector3();
   private projected = new THREE.Vector3();
   private goal = new THREE.Vector3();
   private size = new THREE.Vector2();
@@ -636,15 +747,17 @@ export class GameScene {
       r.suspension.rotation.x += 0.045;
       r.suspension.position.y -= 0.035;
     }
-    for (const w of r.wheels) w.rotation.x += (dt * r.speed) / 0.46;
+    for (const w of r.wheels) w.rotation.x += (dt * r.speed) / r.wheelRadius;
     if ((p?.frontCooldown ?? 0) > r.lastFrontCooldown + 0.05) r.meleeConnected = false;
     r.lastFrontCooldown = p?.frontCooldown ?? 0;
     if (r.meleeHold > 0) r.meleeHold = Math.max(0, r.meleeHold - dt);
     else this.animateMelee(r, p, dt);
     r.burn.visible = !!p?.burning;
     r.flame.visible = !!p?.topActive && r.top === 'flamethrower';
-    if (r.flame.visible && p?.alive)
-      this.effects.flame(r.group.position.x, r.group.position.z, r.group.rotation.y, dt);
+    if (r.flame.visible && p?.alive) {
+      const tip = r.muzzle.getWorldPosition(this.muzzlePoint);
+      this.effects.flame(tip.x, tip.y, tip.z, r.group.rotation.y, dt);
+    }
     r.flame.children.forEach((o, i) => {
       o.scale.setScalar(1 + Math.sin(time * 35 + i) * 0.2);
       o.rotation.z = time * 6 + i;
@@ -834,18 +947,14 @@ export class GameScene {
             }
             const a = attacker.group.position,
               b = victim.group.position;
-            const distance = Math.max(0.001, Math.hypot(b.x - a.x, b.z - a.z));
-            this.effects.melee(
-              b.x - ((b.x - a.x) / distance) * 0.85,
-              b.z - ((b.z - a.z) / distance) * 0.85,
-              yaw,
-              event.melee,
-            );
-            this.wow.melee(
-              b.x - ((b.x - a.x) / distance) * 0.85,
-              b.z - ((b.z - a.z) / distance) * 0.85,
-              event.melee,
-            );
+            // Contact sits on the victim's scaled hull, at the attacker's scaled attachment height.
+            const reach =
+              (0.85 * victim.group.scale.x) / Math.max(0.001, Math.hypot(b.x - a.x, b.z - a.z));
+            const cx = b.x - (b.x - a.x) * reach,
+              cz = b.z - (b.z - a.z) * reach,
+              cy = 0.95 * attacker.group.scale.x;
+            this.effects.melee(cx, cz, yaw, event.melee, cy);
+            this.wow.melee(cx, cz, event.melee, cy);
             if (watched && !grinding) {
               const proximity = Math.max(
                 0,
@@ -864,23 +973,24 @@ export class GameScene {
             this.shake = Math.min(0.24, this.shake + Math.max(0, 1 - distance / 20) * 0.16);
           }
           if (event.type === 'shot' && victim) {
-            this.effects.shot(
-              victim.group.position.x,
-              victim.group.position.z,
-              victim.group.rotation.y,
-              victim.top,
-            );
+            const tip = victim.muzzle.getWorldPosition(this.muzzlePoint);
+            this.effects.shot(tip.x, tip.y, tip.z, victim.group.rotation.y, victim.top);
           } else {
+            const y = victim?.group.scale.x ?? 1;
             this.effects.impact(
               event.x,
               event.z,
               event.type === 'elimination' || event.type === 'explosion',
+              y,
             );
-            this.wow.impact(event.x, event.z, event.type);
+            this.wow.impact(event.x, event.z, event.type, y);
           }
         }
       if (this.seenEvents.size > 2000) this.seenEvents = new Set(state.events.map((e) => e.id));
-      this.effects.sync(state.projectiles);
+      this.effects.sync(
+        state.projectiles,
+        (id) => this.robots.get(id)?.muzzle.getWorldPosition(this.muzzlePoint).y ?? 1.35,
+      );
     } else {
       // Free the finished match's robots instead of keeping them on the GPU in menus.
       for (const r of this.robots.values()) this.removeRobot(r);

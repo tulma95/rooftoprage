@@ -11,6 +11,7 @@ import {
   ARENA_HALF,
   CHASSIS,
   ROBOT_RADIUS,
+  robotRadius,
   ROUND_SECONDS,
   WEAPONS,
   WEDGE_RULES,
@@ -345,13 +346,14 @@ export class Simulation {
           b = active[j]!;
         const dx = b.x - a.x,
           dz = b.z - a.z,
-          d = Math.hypot(dx, dz);
-        if (d > ROBOT_RADIUS * 2) continue;
+          d = Math.hypot(dx, dz),
+          contact = robotRadius(a.chassis) + robotRadius(b.chassis);
+        if (d > contact) continue;
         const nx = d > 0.001 ? dx / d : 1,
           nz = d > 0.001 ? dz / d : 0;
         const invA = 1 / CHASSIS[a.chassis].mass,
           invB = 1 / CHASSIS[b.chassis].mass;
-        const overlap = ROBOT_RADIUS * 2 - d;
+        const overlap = contact - d;
         a.x -= (nx * overlap * invA) / (invA + invB);
         a.z -= (nz * overlap * invA) / (invA + invB);
         b.x += (nx * overlap * invB) / (invA + invB);
@@ -404,7 +406,7 @@ export class Simulation {
         const dx = p.x - tank.x,
           dz = p.z - tank.z,
           d = Math.hypot(dx, dz);
-        const gap = ROBOT_RADIUS + H.tankRadius;
+        const gap = robotRadius(p.chassis) + H.tankRadius;
         if (d >= gap) continue;
         const nx = d > 0.001 ? dx / d : 1,
           nz = d > 0.001 ? dz / d : 0;
@@ -456,6 +458,9 @@ export class Simulation {
   }
 
   private resolveCloseCombat(active: PlayerState[], dt: number, damage: TickDamage) {
+    // Weapon ranges are tuned against a standard hull; smaller hulls must be approached closer.
+    const reach = (target: PlayerState, d: number) =>
+      d - robotRadius(target.chassis) + ROBOT_RADIUS;
     const { hurt } = damage;
     for (const a of active) {
       let swept = false;
@@ -470,7 +475,7 @@ export class Simulation {
                   distance = Math.hypot(dx, dz);
                 const aim =
                   (dx * Math.sin(a.yaw) + dz * Math.cos(a.yaw)) / Math.max(0.001, distance);
-                return distance <= WEAPONS.hook.range && aim > FRONT_RULES.hook.aim;
+                return reach(b, distance) <= WEAPONS.hook.range && aim > FRONT_RULES.hook.aim;
               })
               .sort(
                 (b, c) => Math.hypot(b.x - a.x, b.z - a.z) - Math.hypot(c.x - a.x, c.z - a.z),
@@ -485,7 +490,7 @@ export class Simulation {
         const frontRules = FRONT_RULES[a.front];
         if (
           a.frontActive &&
-          d <= WEAPONS[a.front].range &&
+          reach(b, d) <= WEAPONS[a.front].range &&
           aim > frontRules.aim &&
           (a.front !== 'hook' || b === hookTarget)
         ) {
@@ -540,7 +545,7 @@ export class Simulation {
         if (
           a.topActive &&
           a.top === 'flamethrower' &&
-          d < WEAPONS.flamethrower.range &&
+          reach(b, d) < WEAPONS.flamethrower.range &&
           aim > 0.82
         ) {
           hurt(b, WEAPONS.flamethrower.damage * dt, a.id);
@@ -555,7 +560,14 @@ export class Simulation {
     const { hurt, hitTank } = damage;
     // Positions are fixed during this pass; targets destroyed mid-pass are skipped below.
     const targets = [
-      ...active.map((p) => ({ id: p.id, x: p.x, z: p.z, radius: ROBOT_RADIUS, tank: null, p })),
+      ...active.map((p) => ({
+        id: p.id,
+        x: p.x,
+        z: p.z,
+        radius: robotRadius(p.chassis),
+        tank: null,
+        p,
+      })),
       ...s.tanks
         .filter((t) => t.hp > 0)
         .map((t) => ({ id: t.id, x: t.x, z: t.z, radius: H.tankRadius, tank: t, p: null })),

@@ -62,6 +62,13 @@ export function isChassis(value: unknown): value is Chassis {
   return typeof value === 'string' && Object.hasOwn(CHASSIS, value);
 }
 export const ROBOT_RADIUS = 1.05;
+/** Weaker chassis are physically smaller and harder to hit: Dart 0.73x … Bulwark 1.14x. */
+export function chassisScale(chassis: Chassis): number {
+  return Math.sqrt(CHASSIS[chassis].hp / CHASSIS.bruiser.hp);
+}
+export function robotRadius(chassis: Chassis): number {
+  return ROBOT_RADIUS * chassisScale(chassis);
+}
 export const ROUND_SECONDS = 300;
 /** Server simulation and snapshot interval. */
 export const TICK_SECONDS = 0.05;

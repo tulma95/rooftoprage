@@ -134,16 +134,16 @@ export class WowEffects {
     s.object.visible = true;
   }
 
-  melee(x: number, z: number, weapon: FrontWeapon): void {
+  melee(x: number, z: number, weapon: FrontWeapon, y = 0.95): void {
     // Grinding weapons hit every frame: a small flare only.
     const grinding = weapon === 'saw' || weapon === 'drill' || weapon === 'wedge';
-    this.flash(x, 0.95, z, grinding ? 1.4 : 3.2);
+    this.flash(x, y, z, grinding ? 1.4 : 3.2);
     if (!grinding) this.ring(x, z, weapon === 'hammer' ? 6 : 4.5);
   }
 
-  impact(x: number, z: number, type: GameEvent['type']): void {
+  impact(x: number, z: number, type: GameEvent['type'], y = 1): void {
     const big = type !== 'hit';
-    this.flash(x, 1, z, big ? 7 : 2.4);
+    this.flash(x, y, z, big ? 7 : 2.4);
     if (big) this.ring(x, z, type === 'explosion' ? 11 : 9);
   }
 
