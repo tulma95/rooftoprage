@@ -108,7 +108,7 @@ export const WEAPONS = {
     damage: 4,
     range: 2.9,
     cooldown: 1.8,
-    description: 'Launch opponents forward and lift them for 0.65s. 4 damage; 1.8s cooldown.',
+    description: 'Launch opponents forward and lift them for 1s. 4 damage; 1.8s cooldown.',
   },
   hook: {
     name: 'Tow Hook',
@@ -133,7 +133,7 @@ export const WEAPONS = {
     damage: 16,
     range: 3.2,
     cooldown: 1.8,
-    description: 'A heavy forward strike: 16 damage and a small shove; 1.8s cooldown.',
+    description: 'A heavy forward strike: 16 damage and a solid shove; 1.8s cooldown.',
   },
   drill: {
     name: 'Auger Drill',
@@ -184,13 +184,13 @@ export const PROJECTILE_RULES = {
   railgun: { speed: 65, angles: [0], piercing: true },
 } as const;
 export const FRONT_RULES = {
-  ram: { aim: 0.45, push: 18, continuous: false },
+  ram: { aim: 0.45, push: 30, continuous: false },
   wedge: { aim: 0.72, push: 0, continuous: true },
-  sweeper: { aim: 0.3, push: 16, continuous: false },
-  flipper: { aim: 0.7, push: 14, continuous: false },
-  hook: { aim: 0.75, push: 13, continuous: false },
+  sweeper: { aim: 0.3, push: 26, continuous: false },
+  flipper: { aim: 0.7, push: 22, continuous: false },
+  hook: { aim: 0.75, push: 18, continuous: false },
   saw: { aim: 0.45, push: 0, continuous: true },
-  hammer: { aim: 0.65, push: 5, continuous: false },
+  hammer: { aim: 0.65, push: 14, continuous: false },
   drill: { aim: 0.85, push: 0, continuous: true },
 } as const;
 export const WEAPON_ICONS = {

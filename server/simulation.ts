@@ -528,7 +528,7 @@ export class Simulation {
               (a.front === 'ram'
                 ? this.flankPower(b, dx / Math.max(0.001, d), dz / Math.max(0.001, d))
                 : 1);
-            if (a.front === 'flipper') b.lifted = Math.max(b.lifted ?? 0, 0.65);
+            if (a.front === 'flipper') b.lifted = Math.max(b.lifted ?? 0, 1);
             const recoil = a.front === 'flipper' ? 0.22 : 0.18;
             b.vx = (b.vx ?? 0) + (Math.sin(a.yaw) * force) / CHASSIS[b.chassis].mass;
             b.vz = (b.vz ?? 0) + (Math.cos(a.yaw) * force) / CHASSIS[b.chassis].mass;

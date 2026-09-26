@@ -59,7 +59,7 @@ test('flipper lifts and launches the target forward while recoiling backward', (
   assert.ok(a!.vz! < 0);
   assert.ok(b!.lifted! >= 0.5);
   sim.setInput('a', EMPTY_INPUT);
-  for (let i = 0; i < 15; i++) sim.step(0.05);
+  for (let i = 0; i < 22; i++) sim.step(0.05);
   assert.equal(b!.lifted, 0, 'the launched target must regain traction');
 });
 
