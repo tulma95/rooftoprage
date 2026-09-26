@@ -16,7 +16,7 @@ try {
     await page.locator('#nickname').fill(`Arsenal ${i + 1}`);
     await page.locator('#name-form button').click();
     await page.getByRole('button', { name: 'Customize machine' }).click();
-    assert.equal(await page.locator('[data-equip]').count(), 8);
+    assert.equal(await page.locator('[data-equip]').count(), 12);
     await page.locator(`[data-equip="${i === 0 ? 'hammer' : 'drill'}"]`).click();
     await page.locator(`[data-equip="${i === 0 ? 'railgun' : 'scattergun'}"]`).click();
     await page.waitForTimeout(500);

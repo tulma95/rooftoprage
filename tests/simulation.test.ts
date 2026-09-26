@@ -1,9 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Simulation } from '../server/simulation.js';
+import { COOLING_POOLS, HAZARD_RULES as H, OIL_SLICKS } from '../shared/hazards.js';
 import {
   ARENA_HALF,
   EMPTY_INPUT,
+  ROBOT_RADIUS,
   makePlayer,
   validEquipment,
   validInput,
@@ -51,6 +53,20 @@ test('round reset restores health, stats and fair distinct spawns', () => {
     ) > 20,
   );
 });
+test('2–4 player spawns sit outside tank blast radius and off oil and pools', () => {
+  for (const count of [2, 3, 4]) {
+    const sim = new Simulation();
+    sim.state.players = Array.from({ length: count }, (_, i) =>
+      makePlayer(`p${i}`, `P${i}`, 'ram', 'cannon', i),
+    );
+    sim.start();
+    for (const p of sim.state.players) {
+      for (const t of sim.state.tanks) assert.ok(Math.hypot(p.x - t.x, p.z - t.z) > H.blastRadius);
+      for (const area of [...OIL_SLICKS, ...COOLING_POOLS])
+        assert.ok(Math.hypot(p.x - area.x, p.z - area.z) > area.radius + ROBOT_RADIUS);
+    }
+  }
+});
 test('stale controls stop motion and eliminated robots cannot drive', () => {
   const sim = match(),
     a = sim.state.players[0]!;
@@ -71,17 +87,19 @@ test('ram pushes and damages only forward targets and obeys cooldown', () => {
   Object.assign(b!, { x: 0, z: 2.5 });
   input(sim, 'a', { front: true });
   sim.step(0.05);
-  assert.equal(b!.hp, 88);
-  assert.ok(b!.z > 5);
-  assert.equal(a!.stats.damage, 12);
-  b!.z = 2.5;
+  assert.equal(b!.hp, 94);
+  assert.ok(b!.vz! > 0);
+  assert.ok(a!.vz! < 0);
+  assert.equal(a!.stats.damage, 6);
+  Object.assign(a!, { x: 0, z: 0, vx: 0, vz: 0 });
+  Object.assign(b!, { x: 0, z: 2.5, vx: 0, vz: 0 });
   input(sim, 'a', { front: true });
   sim.step(0.05);
-  assert.equal(b!.hp, 88);
+  assert.equal(b!.hp, 94);
   a!.frontCooldown = 0;
-  b!.z = -2.5;
+  Object.assign(b!, { z: -2.5, vx: 0, vz: 0 });
   sim.step(0.05);
-  assert.equal(b!.hp, 88);
+  assert.equal(b!.hp, 94);
 });
 test('cannon uses swept hits, awards damage, and obeys cooldown', () => {
   const sim = match(),
@@ -90,7 +108,7 @@ test('cannon uses swept hits, awards damage, and obeys cooldown', () => {
   Object.assign(b!, { x: 0, z: 5 });
   input(sim, 'a', { top: true });
   sim.step(0.2);
-  assert.equal(b!.hp, 76);
+  assert.equal(b!.hp, 88);
   assert.equal(a!.stats.shots, 1);
   input(sim, 'a', { top: true });
   sim.step(0.05);
@@ -103,13 +121,13 @@ test('flamethrower has a forward cone and heat lockout', () => {
   Object.assign(b!, { x: 0, z: 4 });
   input(sim, 'a', { top: true });
   sim.step(0.1);
-  assert.ok(Math.abs(b!.hp - 98.3) < 0.001);
+  assert.ok(Math.abs(b!.hp - 99.2) < 0.001);
   b!.z = -4;
   for (let n = 0; n < 65; n++) {
     input(sim, 'a', { top: true });
     sim.step(0.05);
   }
-  assert.equal(b!.hp, 98.3);
+  assert.equal(b!.hp, 99.2);
   assert.equal(a!.overheated, true);
   assert.equal(a!.topActive, false);
   for (let n = 0; n < 90; n++) sim.step(0.05);
@@ -119,8 +137,8 @@ test('flamethrower has a forward cone and heat lockout', () => {
 test('simultaneous lethal saw hits draw and credit both attackers', () => {
   const sim = match(),
     [a, b] = sim.state.players;
-  Object.assign(a!, { x: 0, z: 0, yaw: 0, front: 'saw', hp: 1 });
-  Object.assign(b!, { x: 0, z: 2.5, yaw: Math.PI, hp: 1 });
+  Object.assign(a!, { x: 0, z: 0, yaw: 0, front: 'saw', hp: 0.5 });
+  Object.assign(b!, { x: 0, z: 2.5, yaw: Math.PI, hp: 0.5 });
   input(sim, 'a', { front: true });
   input(sim, 'b', { front: true });
   sim.step(0.05);
@@ -152,7 +170,7 @@ test('later zero-damage attacks cannot steal a lethal hit in the same tick', () 
     const c = makePlayer('c', 'Late attacker', 'saw', 'flamethrower', 2);
     sim.state.players.push(c);
     Object.assign(a!, { x: 0, z: 0, yaw: 0, front: 'saw' });
-    Object.assign(b!, { x: 0, z: 2.5, hp: 1 });
+    Object.assign(b!, { x: 0, z: 2.5, hp: 0.5 });
     Object.assign(c, { x: 0, z: flame ? 8 : 5, yaw: Math.PI });
     input(sim, 'a', { front: true });
     input(sim, 'c', flame ? { top: true } : { front: true });

@@ -1,5 +1,6 @@
 import {
   CHASSIS,
+  BOOST_COOLDOWN,
   WEAPONS,
   WEAPON_ICONS,
   type RoomState,
@@ -94,13 +95,26 @@ export class BattleHud {
       const weapons = `${p.front}/${p.top}/${spectator}`;
       if (weapons !== this.weaponSignature) {
         this.weaponSignature = weapons;
-        this.node('.hud-weapons').innerHTML = (['front', 'top'] as const)
-          .map(
-            (slot) =>
-              `<div class="weapon-hud" data-slot="${slot}">${tag(slot)}<strong><span aria-hidden="true">${WEAPON_ICONS[p[slot]]}</span>${WEAPONS[p[slot]].name} ${spectator ? '' : `<kbd>${slot === 'front' ? 'Space' : 'E'}</kbd>`}</strong><small></small><div class="meter"><i></i></div></div>`,
-          )
-          .join('');
+        this.node('.hud-weapons').innerHTML =
+          (['front', 'top'] as const)
+            .map(
+              (slot) =>
+                `<div class="weapon-hud" data-slot="${slot}">${tag(slot)}<strong><span aria-hidden="true">${WEAPON_ICONS[p[slot]]}</span>${WEAPONS[p[slot]].name} ${spectator ? '' : `<kbd>${slot === 'front' ? 'Space' : 'E'}</kbd>`}</strong><small></small><div class="meter"><i></i></div></div>`,
+            )
+            .join('') +
+          `<div class="weapon-hud burst-hud" data-slot="boost">${tag('Movement')}<strong>Short burst ${spectator ? '' : '<kbd>Shift</kbd>'}</strong><small></small><div class="meter"><i></i></div></div>`;
       }
+      const boostCooldown = p.boostCooldown ?? 0;
+      this.text(
+        '[data-slot="boost"] small',
+        (p.boostRemaining ?? 0) > 0
+          ? 'BURSTING'
+          : boostCooldown > 0
+            ? `RECHARGING · ${boostCooldown.toFixed(1)}s`
+            : 'READY · MOVE + SHIFT',
+      );
+      this.node('[data-slot="boost"] .meter i').style.width =
+        `${Math.max(0, 1 - boostCooldown / BOOST_COOLDOWN) * 100}%`;
       for (const slot of ['front', 'top'] as const) {
         const key = p[slot],
           cooldown = slot === 'front' ? p.frontCooldown : p.topCooldown;
@@ -141,12 +155,13 @@ export class BattleHud {
         s.round,
         s.winnerId,
         s.draw,
+        s.hostId === sessionId,
         s.players.map(({ name, stats }) => [name, stats]),
       ]);
       if (results !== this.resultsSignature) {
         this.resultsSignature = results;
         this.node('.results').innerHTML =
-          `${tag(`Round ${s.round} complete`)}<h1>${s.draw ? 'DRAW' : s.winnerId === sessionId ? 'VICTORY' : 'ELIMINATED'}</h1><p>${s.draw ? 'No single survivor. The roof wins.' : `${escape(s.players.find((player) => player.id === s.winnerId)?.name || 'Unknown pilot')} is the last robot standing.`}</p><table><thead><tr><th>Pilot</th><th>Damage</th><th>KOs</th><th>Shots</th></tr></thead><tbody>${s.players.map((player) => `<tr><td>${escape(player.name)}</td><td>${Math.round(player.stats.damage)}</td><td>${player.stats.kills}</td><td>${player.stats.shots}</td></tr>`).join('')}</tbody></table><div class="actions">${button('again', 'Play again', 'primary')}${button('results-garage', 'Return to garage')}</div>`;
+          `${tag(`Round ${s.round} complete`)}<h1>${s.draw ? 'DRAW' : s.winnerId === sessionId ? 'VICTORY' : 'ELIMINATED'}</h1><p>${s.draw ? 'No single survivor. The roof wins.' : `${escape(s.players.find((player) => player.id === s.winnerId)?.name || 'Unknown pilot')} is the last robot standing.`}</p><table><thead><tr><th>Pilot</th><th>Damage</th><th>KOs</th><th>Shots</th></tr></thead><tbody>${s.players.map((player) => `<tr><td>${escape(player.name)}</td><td>${Math.round(player.stats.damage)}</td><td>${player.stats.kills}</td><td>${player.stats.shots}</td></tr>`).join('')}</tbody></table><div class="actions">${s.hostId === sessionId ? button('again', 'Play again', 'primary') : '<p class="muted">The host starts the next round.</p>'}${button('results-garage', 'Return to garage')}</div>`;
       }
     }
   }

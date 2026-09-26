@@ -11,7 +11,7 @@ try {
       body: '<body style="margin:0"><canvas style="width:100vw;height:100vh"></canvas></body>',
     }),
   );
-  await page.goto('http://localhost:5173/visual-check');
+  await page.goto(`${process.env.BROWSER_URL || 'http://localhost:5173'}/visual-check`);
   await page.evaluate(async () => {
     const { GameScene } = await import('/client/scene.ts');
     const { makePlayer, EMPTY_INPUT } = await import('/shared/game.ts');

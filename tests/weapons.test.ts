@@ -29,8 +29,8 @@ function close(actual: number, expected: number) {
   assert.ok(Math.abs(actual - expected) < 0.000001, `${actual} should equal ${expected}`);
 }
 
-test('all sixteen loadouts are valid and new weapons cannot occupy the wrong slot', () => {
-  for (const front of ['ram', 'saw', 'hammer', 'drill'])
+test('all thirty-two loadouts are valid and front attachments cannot occupy the wrong slot', () => {
+  for (const front of ['ram', 'wedge', 'sweeper', 'flipper', 'hook', 'saw', 'hammer', 'drill'])
     for (const top of ['cannon', 'flamethrower', 'scattergun', 'railgun']) {
       assert.equal(validEquipment({ front, top }), true, `${front}/${top}`);
       assert.equal(validEquipment({ front: top, top: front }), false);
@@ -41,24 +41,25 @@ test('all sixteen loadouts are valid and new weapons cannot occupy the wrong slo
   }
 });
 
-test('hammer delivers one heavy hit and short shove per cooldown', () => {
+test('hammer delivers one heavy hit and momentum shove per cooldown', () => {
   const sim = match(),
     [a, b] = sim.state.players;
   b!.z = 2.5;
   input(sim, { front: true });
   sim.step(0.05);
-  assert.equal(b!.hp, 68);
-  close(b!.z, 3.2);
-  assert.equal(a!.stats.damage, 32);
-  b!.z = 2.5;
+  assert.equal(b!.hp, 84);
+  assert.ok(b!.vz! > 0);
+  assert.equal(a!.stats.damage, 16);
+  Object.assign(a!, { x: 0, z: 0, vx: 0, vz: 0 });
+  Object.assign(b!, { x: 0, z: 2.5, vx: 0, vz: 0 });
   for (let i = 0; i < 17; i++) {
     input(sim, { front: true });
     sim.step(0.1);
   }
-  assert.equal(b!.hp, 68);
+  assert.equal(b!.hp, 84);
   input(sim, { front: true });
   sim.step(0.11);
-  assert.equal(b!.hp, 36);
+  assert.equal(b!.hp, 68);
 });
 
 test('hammer misses behind, outside its arc, and beyond reach', () => {
@@ -83,8 +84,8 @@ test('drill applies continuous damage only inside its narrow cone and reach', ()
     input(sim, { front: true });
     sim.step(0.1);
   }
-  close(b!.hp, 86);
-  close(a!.stats.damage, 14);
+  close(b!.hp, 93);
+  close(a!.stats.damage, 7);
   assert.equal(a!.frontCooldown, 0);
   for (const [x, z] of [
     [1.7, 2],
@@ -94,12 +95,12 @@ test('drill applies continuous damage only inside its narrow cone and reach', ()
     Object.assign(b!, { x, z });
     input(sim, { front: true });
     sim.step(0.1);
-    close(b!.hp, 86);
+    close(b!.hp, 93);
   }
   Object.assign(b!, { x: 0, z: 2.5 });
   input(sim, { front: false });
   sim.step(0.1);
-  close(b!.hp, 86);
+  close(b!.hp, 93);
 });
 
 test('scattergun fires five symmetric pellets and counts one shot per cooldown', () => {
@@ -125,13 +126,13 @@ test('scattergun fires five symmetric pellets and counts one shot per cooldown',
   assert.equal(a.stats.shots, 2);
 });
 
-test('scattergun pellets combine for 35 damage at close range', () => {
+test('scattergun pellets combine for 20 damage at close range', () => {
   const sim = match('drill', 'scattergun');
   sim.state.players[1]!.z = 4;
   input(sim, { top: true });
   sim.step(0.1);
-  assert.equal(sim.state.players[1]!.hp, 65);
-  assert.equal(sim.state.players[0]!.stats.damage, 35);
+  assert.equal(sim.state.players[1]!.hp, 80);
+  assert.equal(sim.state.players[0]!.stats.damage, 20);
   assert.equal(sim.state.projectiles.length, 0);
 });
 
@@ -144,16 +145,16 @@ test('railgun pierces multiple opponents and never damages one twice', () => {
   sim.state.players.push(c);
   input(sim, { top: true });
   sim.step(0.025);
-  assert.equal(b!.hp, 58);
+  assert.equal(b!.hp, 79);
   assert.equal(c.hp, 100);
   assert.equal(sim.state.projectiles.length, 1);
   input(sim, { top: false });
   sim.step(0.005);
-  assert.equal(b!.hp, 58);
+  assert.equal(b!.hp, 79);
   sim.step(0.05);
-  assert.equal(c.hp, 58);
-  assert.equal(b!.hp, 58);
-  assert.equal(a!.stats.damage, 84);
+  assert.equal(c.hp, 79);
+  assert.equal(b!.hp, 79);
+  assert.equal(a!.stats.damage, 42);
   input(sim, { top: true });
   sim.step(0.1);
   assert.equal(a!.stats.shots, 1);
@@ -167,6 +168,18 @@ test('railgun pierces multiple opponents and never damages one twice', () => {
   assert.equal(a!.stats.shots, 2);
 });
 
+test('a robot knocked to 0 HP this tick does not shield the robot behind it', () => {
+  const sim = match('drill', 'cannon');
+  sim.state.players.push(makePlayer('c', 'Behind', 'ram', 'cannon', 2));
+  Object.assign(sim.state.players[2]!, { x: 0, z: 12 });
+  input(sim, { top: true });
+  sim.step(0.001);
+  input(sim, { top: false });
+  Object.assign(sim.state.projectiles[0]!, { x: 0, z: 8.5, distance: 8.5 });
+  sim.state.players[1]!.hp = 0; // Still alive in this tick's roster, pending elimination.
+  sim.step(0.15);
+  assert.equal(sim.state.players[2]!.hp, 100 - 12);
+});
 test('projectile travel is clipped to remaining range before checking hits', () => {
   for (const top of ['scattergun', 'railgun'] as const) {
     const sim = match('drill', top);

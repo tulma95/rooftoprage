@@ -15,7 +15,7 @@ try {
       }
     };
   });
-  await page.goto(process.env.BROWSER_URL || 'http://localhost:6173');
+  await page.goto(process.env.BROWSER_URL || 'http://localhost:5173');
   await page.locator('#nickname').waitFor();
   assert.equal(await page.evaluate(() => window.__audio.length), 0, 'No audio before interaction');
   await page.locator('#nickname').fill('Neon Pilot');

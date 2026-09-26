@@ -2,6 +2,13 @@ import { CHASSIS, WEAPONS, WEAPON_ICONS, type RoomState } from '../shared/game.j
 import type { Profile, Settings } from './profile.js';
 import type { Screen } from './navigation.js';
 import { escape, button, tag } from './html.js';
+const movementRoles: Record<string, string> = {
+  ram: 'SHOVE + RECOIL',
+  wedge: 'LIFT + PUSH',
+  sweeper: 'SIDE SHOVE + SPIN',
+  flipper: 'LAUNCH + LIFT',
+  hook: 'PULL TOGETHER',
+};
 function equipment({ chassis, front, top }: Pick<Profile, 'chassis' | 'front' | 'top'>) {
   return `<div class="chassis-picker">${tag('Chassis')}<div class="choices">${Object.entries(
     CHASSIS,
@@ -21,7 +28,7 @@ function equipment({ chassis, front, top }: Pick<Profile, 'chassis' | 'front' | 
           .filter(([, w]) => w.slot === slot)
           .map(
             ([key, w]) =>
-              `<button data-equip="${key}" class="choice ${(slot === 'front' ? front : top) === key ? 'selected' : ''}"><span class="weapon-symbol">${WEAPON_ICONS[key as keyof typeof WEAPON_ICONS]}</span><strong>${w.name}</strong><small>${w.damage}${key === 'scattergun' ? ' × 5' : w.cooldown === 0 ? '/s' : ''} DMG · ${w.range}m</small></button>`,
+              `<button data-equip="${key}" aria-pressed="${(slot === 'front' ? front : top) === key}" class="choice ${(slot === 'front' ? front : top) === key ? 'selected' : ''}"><span class="weapon-symbol">${WEAPON_ICONS[key as keyof typeof WEAPON_ICONS]}</span><strong>${w.name}</strong><small>${movementRoles[key] || `${w.damage}${key === 'scattergun' ? ' × 5' : w.cooldown === 0 ? '/s' : ''} DMG`} · ${w.range}m</small></button>`,
           )
           .join(
             '',
@@ -47,7 +54,7 @@ export function settingsForm(settings: Settings) {
     )}<p class="muted">Settings save automatically. The online battle continues while this menu is open.</p>`;
 }
 export function help() {
-  return `${tag('Field manual')}<h2>Stay on the roof.</h2><p>Destroy every other robot, or push them over the edge. One life. Five minutes. More than one survivor at timeout means a draw.</p><div class="controls"><p><kbd>W</kbd> <kbd>S</kbd> Forward / reverse</p><p><kbd>A</kbd> <kbd>D</kbd> Turn and aim</p><p><kbd>Space</kbd> Front weapon</p><p><kbd>E</kbd> Top weapon</p><p><kbd>Esc</kbd> Battle menu</p></div><p class="muted">Weapons fire forward. Steer to aim. Hold an activation key to keep firing. Falling is fatal. Eliminated pilots can watch the survivors.</p><p class="muted">Yellow-banded fuel tanks explode and chain together. Flames and tank blasts ignite dark oil slicks; oil reduces steering grip. Fire clings to robots for 3 seconds. Cyan cooling pools slow you down, extinguish fire, and cool the Furnace Jet faster.</p>`;
+  return `${tag('Field manual')}<h2>Stay on the roof.</h2><p>Destroy every other robot, or push them over the edge. One life. Five minutes. More than one survivor at timeout means a draw.</p><div class="controls"><p><kbd>W</kbd> <kbd>S</kbd> or <kbd>↑</kbd> <kbd>↓</kbd> Forward / reverse</p><p><kbd>A</kbd> <kbd>D</kbd> or <kbd>←</kbd> <kbd>→</kbd> Turn and aim</p><p><kbd>Shift</kbd> Short burst · direction keys to dodge</p><p><kbd>Space</kbd> Front attachment</p><p><kbd>E</kbd> Top weapon</p><p><kbd>Esc</kbd> Battle menu</p></div><p class="muted">Build speed and hit the sides or rear for stronger shoves and spins. Tap Shift for a short burst; combine it with left or right to dodge sideways. It recharges in 2.5 seconds. The wedge strips traction on contact; hold Space for a powered shove. Side Sweeper knocks sideways and spins, Flip Fork launches and lifts, and Tow Hook briefly pulls both robots together. Weapons fire forward. Steer to aim. Hold an activation key to keep firing. Falling is fatal. Eliminated pilots can watch the survivors.</p><p class="muted">Yellow-banded fuel tanks explode and chain together. Flames and tank blasts ignite dark oil slicks; oil reduces steering grip. Fire clings to robots for 3 seconds. Cyan cooling pools slow you down, extinguish fire, and cool the Furnace Jet faster.</p>`;
 }
 export interface ScreenView extends Profile {
   screen: Screen;
@@ -57,6 +64,7 @@ export interface ScreenView extends Profile {
   online: boolean;
   error: string;
   inviteCode: string;
+  touchOnly: boolean;
 }
 export function screenMarkup({
   screen,
@@ -71,6 +79,7 @@ export function screenMarkup({
   online,
   error,
   inviteCode,
+  touchOnly,
 }: ScreenView): string {
   let content = '';
   if (screen === 'name')
@@ -80,7 +89,7 @@ export function screenMarkup({
   if (screen === 'garage')
     content = `${tag('Workshop / choose your chassis')}<h1>YOUR MACHINE.<br>YOUR PROBLEM.</h1><p class="lede">${CHASSIS[chassis].name}. ${CHASSIS[chassis].description}</p>${equipment({ chassis, front, top })}<div class="actions">${button('save-equipment', 'Save loadout', 'primary')}${button(room ? 'lobby' : 'home', 'Back', 'quiet')}</div>`;
   if (screen === 'play')
-    content = `${tag('Choose your fight')}<h1>TAKE IT<br>TO THE ROOF.</h1><p class="lede">Practice solo against three bots, or create a room and invite friends.</p>${button('practice', busy ? 'Connecting…' : 'Play with bots', '', busy)}${button('create', busy ? 'Connecting…' : 'Create private room', 'primary', busy)}<div class="divider">OR JOIN A CREW</div><form id="join-form"><label for="code">Room code or invite link</label><input id="code" name="code" placeholder="e.g. A1B2C3" value="${escape(inviteCode)}" required><button ${busy ? 'disabled' : ''}>${busy ? 'Connecting…' : 'Join room →'}</button></form>${button('home', 'Back', 'quiet')}`;
+    content = `${tag('Choose your fight')}<h1>TAKE IT<br>TO THE ROOF.</h1><p class="lede">Practice solo against three bots, or create a room and invite friends.</p>${touchOnly ? '<p class="notice">Driving needs a keyboard. Touch controls are not supported yet.</p>' : ''}${button('practice', busy ? 'Connecting…' : 'Play with bots', '', busy)}${button('create', busy ? 'Connecting…' : 'Create private room', 'primary', busy)}<div class="divider">OR JOIN A CREW</div><form id="join-form"><label for="code">Room code or invite link</label><input id="code" name="code" placeholder="e.g. A1B2C3" value="${escape(inviteCode)}" required><button ${busy ? 'disabled' : ''}>${busy ? 'Connecting…' : 'Join room →'}</button></form>${button('home', 'Back', 'quiet')}`;
   if (screen === 'lobby' && state && room) {
     const me = state.players.find((p) => p.id === room.sessionId);
     content = `${tag(state.players.some((p) => p.bot) ? 'Bot practice / staging area' : 'Private room / staging area')}<h1>ASSEMBLE<br>THE CREW.</h1><div class="room-code"><span>${state.players.some((p) => p.bot) ? 'YOU + 3 BOTS' : state.code}</span>${state.players.some((p) => p.bot) ? '' : button('copy', 'Copy invite ↗', 'quiet')}</div><p class="muted">${escape(state.notice || 'Share this code or link. Everyone must be ready before launch.')}</p><div class="roster">${state.players.map((p) => `<div class="pilot"><span class="swatch" style="background:${p.color}"></span><span><strong>${escape(p.name)}${p.bot ? ' · BOT' : ''}${p.id === state!.hostId ? ' · HOST' : ''}${p.id === room!.sessionId ? ' · YOU' : ''}</strong><small>${CHASSIS[p.chassis].name} · ${WEAPONS[p.front].name} / ${WEAPONS[p.top].name}</small></span><b class="${p.ready ? 'ready' : 'muted'}">${p.ready ? 'READY' : 'WAITING'}</b></div>`).join('')}</div><div class="actions">${button('ready', me?.ready ? 'Cancel ready' : 'Ready up', 'primary')}${state.hostId === room.sessionId ? button('start', 'Launch round →', '', state.players.length < 2 || !state.players.every((p) => p.ready)) : '<p class="muted">The host launches the round.</p>'}${button('garage', 'Change loadout', 'quiet')}${button('leave', 'Leave room', 'quiet')}</div>`;

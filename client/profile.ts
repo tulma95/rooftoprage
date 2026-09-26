@@ -25,7 +25,12 @@ export function loadProfile(): Profile {
     chassis: 'mule',
     front: 'ram',
     top: 'cannon',
-    settings: { audio: true, music: true, shake: true, contrast: false },
+    settings: {
+      audio: true,
+      music: true,
+      shake: !matchMedia('(prefers-reduced-motion: reduce)').matches,
+      contrast: false,
+    },
   };
   try {
     const saved = JSON.parse(localStorage.getItem('rooftop-profile') || '{}');

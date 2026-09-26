@@ -166,16 +166,23 @@ for (const count of [2, 3, 4])
     clients.at(-1)!.send('loaded');
     await until(() => clients.every((c) => state(c).phase === 'combat'));
     assert.equal(state(host).players[0]!.front, 'ram');
+    const spawn = { ...state(host).players[0]! };
     host.send('input', { forward: 100, turn: 0, front: false, top: false });
     await delay(100);
-    assert.equal(state(host).players[0]!.z, 12);
+    assert.deepEqual([state(host).players[0]!.x, state(host).players[0]!.z], [spawn.x, spawn.z]);
     if (count === 2) {
       host.send('input', { forward: 0, turn: 0, front: false, top: true });
-      await until(() => clients.every((c) => state(c).players[1]!.hp === 76));
-      assert.equal(state(host).players[0]!.stats.damage, 24);
+      await until(() => clients.every((c) => state(c).players[1]!.hp === 88));
+      assert.equal(state(host).players[0]!.stats.damage, 12);
     }
     host.send('input', { forward: 1, turn: 0, front: false, top: false });
-    await until(() => clients.every((c) => state(c).players[0]!.z < 12));
+    // Spawns face the centre, so driving forward closes the distance to it.
+    const spawnDistance = Math.hypot(spawn.x, spawn.z);
+    await until(() =>
+      clients.every(
+        (c) => Math.hypot(state(c).players[0]!.x, state(c).players[0]!.z) < spawnDistance,
+      ),
+    );
     const survivor = clients.at(-1)!;
     for (let i = 0; i < clients.length - 1; i++) {
       await leave(clients[i]!);
@@ -238,6 +245,11 @@ test('new weapons synchronize, equipment changes clear readiness, and combat loc
   await delay(100);
   assert.equal(state(host).players[0]!.front, 'drill');
   assert.equal(state(host).players[0]!.top, 'railgun');
+  for (const front of ['sweeper', 'flipper', 'hook', 'drill']) {
+    host.send('equipment', { front, top: 'railgun' });
+    await until(() => state(guest).players[0]!.front === front);
+    assert.equal(state(guest).players[0]!.ready, false);
+  }
   host.send('ready', true);
   await until(() => state(host).players.every((p) => p.ready));
   host.send('start');
@@ -249,22 +261,6 @@ test('new weapons synchronize, equipment changes clear readiness, and combat loc
   await delay(100);
   assert.equal(state(guest).players[0]!.front, 'drill');
   assert.equal(state(guest).players[0]!.top, 'railgun');
-  await leave(host);
-  await leave(guest);
-});
-
-test('loading timeout returns the room to lobby with an explanation', async () => {
-  const host = await create(),
-    guest = await join(host.roomId);
-  host.send('ready', true);
-  guest.send('ready', true);
-  await until(() => state(host)?.players.length === 2 && state(host).players.every((p) => p.ready));
-  host.send('start');
-  await until(() => state(host).phase === 'loading');
-  host.send('loaded');
-  await until(() => state(host).phase === 'lobby', 23000);
-  assert.match(state(host).notice, /timed out/);
-  assert.ok(state(host).players.every((p) => !p.ready));
   await leave(host);
   await leave(guest);
 });

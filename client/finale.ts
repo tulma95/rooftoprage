@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { GameEvent, RoomState } from '../shared/game.js';
 
-export const FINALE_DURATION = 3.6;
+const FINALE_DURATION = 3.6;
 /** Only a newly observed decisive elimination qualifies, never retained event history. */
 export function finalElimination(
   previous: RoomState | null,
@@ -36,6 +36,8 @@ export class Finale {
   private yaw = 0;
   private outward = new THREE.Vector3();
   private origin = new THREE.Vector3();
+  private side = new THREE.Vector3();
+  private goal = new THREE.Vector3();
   private debris = new THREE.InstancedMesh(
     new THREE.BoxGeometry(0.22, 0.12, 0.4),
     new THREE.MeshStandardMaterial({ color: '#9bada8', metalness: 0.7, roughness: 0.4 }),
@@ -94,14 +96,13 @@ export class Finale {
       this.yaw + t * 0.65,
       fall ? t * 1.4 : Math.min(t, 0.75),
     );
-    const side = new THREE.Vector3(this.outward.z, 0, -this.outward.x);
-    const cameraPos = this.position
-      .clone()
-      .addScaledVector(this.outward, 9)
-      .addScaledVector(side, 7);
-    cameraPos.y += 4.5;
-    camera.position.lerp(cameraPos, 1 - Math.exp(-dt * 5));
-    target.lerp(this.position.clone().add(new THREE.Vector3(0, 0.6, 0)), 1 - Math.exp(-dt * 8));
+    this.side.set(this.outward.z, 0, -this.outward.x);
+    this.goal.copy(this.position).addScaledVector(this.outward, 9).addScaledVector(this.side, 7);
+    this.goal.y += 4.5;
+    camera.position.lerp(this.goal, 1 - Math.exp(-dt * 5));
+    this.goal.copy(this.position);
+    this.goal.y += 0.6;
+    target.lerp(this.goal, 1 - Math.exp(-dt * 8));
     this.debris.visible = true;
     for (let i = 0; i < 18; i++) {
       const angle = i * 2.39996,

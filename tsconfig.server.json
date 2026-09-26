@@ -1,1 +1,6 @@
-{ "extends": "./tsconfig.json", "include": ["server", "shared"], "exclude": ["client", "tests"] }
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "lib": ["ES2022"], "types": ["node"] },
+  "include": ["server", "shared"],
+  "exclude": ["client", "tests"]
+}

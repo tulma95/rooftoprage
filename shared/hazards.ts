@@ -1,4 +1,4 @@
-import { drive, type Chassis, type Input } from './game.js';
+import { drive, type MovementState, type Input } from './game.js';
 
 export const HAZARD_RULES = {
   tankRadius: 0.9,
@@ -48,11 +48,7 @@ export function within(
 ): boolean {
   return Math.hypot(p.x - area.x, p.z - area.z) < area.radius;
 }
-export function driveTerrain(
-  p: { x: number; z: number; yaw: number; chassis?: Chassis },
-  input: Input,
-  dt: number,
-): void {
+export function driveTerrain(p: MovementState, input: Input, dt: number): void {
   const cooling = COOLING_POOLS.some((pool) => within(p, pool));
   const oily = OIL_SLICKS.some((oil) => within(p, oil));
   drive(

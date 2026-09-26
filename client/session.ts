@@ -32,7 +32,8 @@ export class ArenaSession {
     const joined = code
       ? await this.client.joinById(code, options)
       : await this.client.create('arena', options);
-    joined.reconnection.enabled = false;
+    // Give up after roughly the server's 10 s reconnection window (backoff 0.2 s … 5 s).
+    joined.reconnection.maxRetries = 6;
     this.room = joined;
     this.events.joined(joined);
     onServerMessage(joined, 'snapshot', (state) => {

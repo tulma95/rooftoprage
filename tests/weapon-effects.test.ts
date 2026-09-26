@@ -76,3 +76,55 @@ test('projectile pools accommodate all four pilots and overlapping cannon volley
     32,
   );
 });
+
+test('weapon flashes, shockwaves, flame and trails reuse the bounded particle batch', () => {
+  const scene = new THREE.Scene();
+  const effects = new WeaponEffects(scene);
+  const children = [...scene.children];
+  for (const weapon of ['cannon', 'scattergun', 'railgun', 'flamethrower'] as const) {
+    effects.shot(0, 0, Math.PI / 2, weapon);
+    effects.step(0);
+    assert.ok(effects.sparks.count >= 36);
+    effects.clear();
+  }
+  effects.sync([projectile(1, 'railgun')]);
+  effects.step(1 / 60);
+  assert.equal(effects.sparks.count, 5);
+  effects.sync([]);
+  effects.step(1);
+  assert.equal(effects.sparks.count, 0);
+  for (let i = 0; i < 100; i++) {
+    effects.impact(0, 0, true);
+    effects.flame(0, 0, 0, 1 / 30);
+    effects.step(1 / 30);
+    assert.ok(effects.sparks.count <= 256);
+  }
+  assert.deepEqual(scene.children, children);
+  effects.clear();
+  effects.step(0);
+  assert.equal(effects.sparks.count, 0);
+});
+
+test('melee contact and swing trails remain bounded and expire for every attachment', () => {
+  const scene = new THREE.Scene();
+  const effects = new WeaponEffects(scene);
+  const children = [...scene.children];
+  for (const weapon of [
+    'ram',
+    'wedge',
+    'sweeper',
+    'flipper',
+    'hook',
+    'saw',
+    'hammer',
+    'drill',
+  ] as const) {
+    effects.melee(2, 3, Math.PI / 2, weapon);
+    effects.meleeTrail(2, 1, 3, weapon);
+    effects.step(0);
+    assert.ok(effects.sparks.count >= 10);
+    effects.step(1);
+    assert.equal(effects.sparks.count, 0);
+  }
+  assert.deepEqual(scene.children, children);
+});

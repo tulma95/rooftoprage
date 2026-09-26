@@ -53,15 +53,17 @@ let busy = false,
   lastPhase = '',
   lastEvent = 0,
   combatMessage = '',
-  combatMessageUntil = 0;
+  combatMessageUntil = 0,
+  saveError = '';
 const controls = new KeyboardInput(playing, () => {
   modal = modal ? '' : 'menu';
   renderModal();
 });
 const input = controls.state;
 function save() {
-  if (!saveProfile({ nickname, chassis, front, top, settings }))
-    error = 'Browser saving is unavailable. You can still play this session.';
+  saveError = saveProfile({ nickname, chassis, front, top, settings })
+    ? ''
+    : 'Browser saving is unavailable. You can still play this session.';
 }
 function applySettings() {
   music.setEnabled(settings.music);
@@ -86,7 +88,9 @@ function playing() {
 function navigate(to: Screen) {
   if (room && (to === 'home' || to === 'play')) to = 'lobby';
   screen = to;
-  error = '';
+  // Surface a failed save on the next screen instead of silently dropping it.
+  error = saveError;
+  saveError = '';
   render();
 }
 function render() {
@@ -103,6 +107,15 @@ function render() {
     return;
   }
   hud = null;
+  // innerHTML replaces every control, so restore keyboard focus to the matching one.
+  const focused = document.activeElement;
+  const focusKey =
+    focused instanceof HTMLElement && app.contains(focused)
+      ? (['action', 'chassis', 'equip', 'setting']
+          .filter((k) => focused.dataset[k])
+          .map((k) => `[data-${k}="${focused.dataset[k]}"]`)[0] ??
+        (focused.id && `#${focused.id}`))
+      : '';
   app.innerHTML = screenMarkup({
     screen,
     nickname,
@@ -116,7 +129,9 @@ function render() {
     online,
     error,
     inviteCode: new URLSearchParams(location.search).get('room') || '',
+    touchOnly: !matchMedia('(any-pointer: fine)').matches,
   });
+  if (focusKey) app.querySelector<HTMLElement>(focusKey)?.focus();
 }
 function renderHud() {
   if (!hud || !state || !room) return;
@@ -132,8 +147,9 @@ function renderModal() {
   const overlay = document.querySelector('#overlay');
   if (!overlay) return;
   overlay.innerHTML = modal
-    ? `<div class="modal-backdrop"><section class="modal glass">${modal === 'leave' ? `<h2>Leave this round?</h2><p>Your robot will be eliminated. You cannot rejoin this round.</p>${button('confirm-leave', 'Leave match', 'primary')}${button('resume', 'Keep playing')}` : `${settingsForm(settings)}${button('resume', 'Resume', 'primary')}${button('help-modal', 'Controls')}${button('leave', 'Leave match')}${modal === 'help' ? help() : ''}`}</section></div>`
+    ? `<div class="modal-backdrop"><section class="modal glass" role="dialog" aria-modal="true" aria-label="${modal === 'leave' ? 'Leave match' : 'Battle menu'}">${modal === 'leave' ? `<h2>Leave this round?</h2><p>Your robot will be eliminated. You cannot rejoin this round.</p>${button('confirm-leave', 'Leave match', 'primary')}${button('resume', 'Keep playing')}` : `${settingsForm(settings)}${button('resume', 'Resume', 'primary')}${button('help-modal', 'Controls')}${button('leave', 'Leave match')}${modal === 'help' ? help() : ''}`}</section></div>`
     : '';
+  overlay.querySelector<HTMLElement>('.modal button')?.focus();
 }
 const session = new ArenaSession(endpoint, {
   joined(joined) {
@@ -255,6 +271,11 @@ app.addEventListener('change', (e) => {
     settings[key] = target.checked;
     applySettings();
     save();
+    if (saveError && !playing()) {
+      error = saveError;
+      saveError = '';
+      render();
+    }
   }
 });
 app.addEventListener('click', async (e) => {
@@ -336,7 +357,7 @@ app.addEventListener('click', async (e) => {
   }
 });
 setInterval(() => {
-  controls.sample(state?.phase === 'combat' && !!local()?.alive && !modal);
+  controls.sample(state?.phase === 'combat' && !!local()?.alive && !modal, local()?.yaw);
   if (room && state?.phase === 'combat') sendClientMessage(room, 'input', input);
   scene.update(state, room?.sessionId || '', input, watched()?.id);
   if (playing() && performance.now() - lastSnapshot > 1500) renderHud();
@@ -356,6 +377,7 @@ function aimLoop() {
 }
 aimLoop();
 async function health() {
+  if (room) return; // Snapshots already prove the connection during a match.
   online = await session.healthy();
   if (!room && !busy) {
     const badge = document.querySelector('.connection');

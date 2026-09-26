@@ -27,7 +27,7 @@ try {
     const state = { code: 'TEST', round: 1, phase: 'combat', players, events: [], projectiles: [] };
     game.update(state, '0', EMPTY_INPUT);
     // Keep the camera fixed so newly revealed scenery cannot affect resource counts.
-    game.setReducedMotion(true);
+    game.setCameraShake(false);
     game.target.set(-4, 0.6, 3);
     game.frame();
     const idleCalls = game.renderer.info.render.calls;
@@ -43,7 +43,12 @@ try {
         z: 3 + Math.floor(i / 5),
         yaw: 0,
       }));
-      for (let i = 0; i < 24; i++) game.effects.burst(i % 4, i % 6, i % 3 === 0);
+      for (let i = 0; i < 4; i++) {
+        game.effects.shot(i * 3 - 4, 0, 0, players[i].top);
+        game.effects.impact(i * 3 - 4, 5, i === 0);
+        game.effects.flame(5, 0, 0, 1 / 60);
+      }
+      game.effects.step(1 / 60);
       game.frame();
     };
     volley(0);
@@ -55,11 +60,21 @@ try {
       peakCalls = Math.max(peakCalls, game.renderer.info.render.calls);
     }
     const sustained = sample();
+    window.weaponEffectsGame = game;
     game.effects.clear();
     state.projectiles = [];
     game.frame();
     return { idleCalls, peakCalls, warm, sustained, clearedSparks: game.effects.sparks.count };
   });
+  await page.evaluate(() => {
+    const game = window.weaponEffectsGame;
+    game.effects.shot(-4, 0, 0, 'cannon');
+    game.effects.shot(2, 0, 0, 'railgun');
+    game.effects.impact(-1, 4, true);
+    game.effects.step(0.08);
+    game.renderer.render(game.scene, game.camera);
+  });
+  await page.screenshot({ path: 'artifacts/weapon-effects.png' });
   assert.deepEqual(result.sustained, result.warm, 'sustained fire must not allocate GPU resources');
   assert.ok(
     result.peakCalls <= result.idleCalls + 21,

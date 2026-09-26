@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
 :root {
   font-family: 'IBM Plex Sans', Arial, sans-serif;
   color: #e7e6df;
@@ -211,7 +210,7 @@ p {
   margin-top: 48px;
   padding-top: 25px;
   border-top: 1px solid #6b766b55;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 1px;
   color: #9ba69d;
 }
@@ -239,7 +238,7 @@ p {
   letter-spacing: 2px;
 }
 .machine-caption > span:last-child {
-  font-size: 9px;
+  font-size: 11px;
   line-height: 2;
   color: #adb6ad;
   letter-spacing: 1px;
@@ -255,7 +254,7 @@ footer {
   justify-content: space-between;
   align-items: center;
   color: #83918a;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 1.8px;
 }
 form {
@@ -420,7 +419,7 @@ kbd {
 .hud-roster small {
   margin-left: auto;
   color: #b9c4b0;
-  font-size: 9px;
+  font-size: 11px;
 }
 .hud-timer {
   position: fixed;
@@ -506,7 +505,7 @@ kbd {
   padding: 14px;
 }
 .weapon-hud .eyebrow {
-  font-size: 9px;
+  font-size: 11px;
   margin-bottom: 7px;
 }
 .weapon-hud strong {
@@ -518,12 +517,12 @@ kbd {
 }
 .weapon-hud small {
   display: block;
-  font-size: 9px;
+  font-size: 11px;
   color: #b8c6ab;
   margin-top: 10px;
 }
 .weapon-hud kbd {
-  font-size: 9px;
+  font-size: 11px;
 }
 .combat-message {
   position: fixed;
@@ -685,7 +684,7 @@ kbd {
     font-size: 49px;
   }
   footer {
-    font-size: 8px;
+    font-size: 11px;
     letter-spacing: 0;
   }
   .hud-roster {
@@ -708,7 +707,7 @@ kbd {
   }
   .hud-menu .connection {
     max-width: 95px;
-    font-size: 8px;
+    font-size: 11px;
   }
   .hud-health {
     bottom: 140px;
@@ -724,6 +723,12 @@ kbd {
   .weapon-hud {
     flex: 1;
     min-width: 0;
+    padding: 10px;
+  }
+  .weapon-hud strong {
+    flex-wrap: wrap;
+    gap: 4px;
+    min-height: 32px;
   }
   .results {
     min-width: 0;
@@ -768,7 +773,7 @@ kbd {
   font-size: 12px;
 }
 .garage .choice small {
-  font-size: 9px;
+  font-size: 11px;
 }
 .garage .weapon-symbol {
   font-size: 23px;

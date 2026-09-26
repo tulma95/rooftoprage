@@ -2,6 +2,12 @@
 
 A desktop robot arena inspired by RobotRage. Build your machine and battle on an industrial rooftop, solo against bots or in a private room with friends.
 
+Drive with WASD or the arrow keys. Tap Shift for a short burst: forward by default, or toward the direction you hold for a quick dodge. Burst recharges in 2.5 seconds. Speed, chassis weight, and impact angle determine how robots shove and spin each other, so leave room to recover near the rooftop edge.
+
+The Impact Ram delivers a shove with recoil (Space). The new Lifter Wedge gets underneath opponents at front contact, reducing their traction while you drive them backward; hold Space for a powered shove at close range. Side and rear rams receive extra force, with rear hits strongest. Existing top weapons remain on E. Solo opponents also use bursts and pushing attachments.
+
+Three more front attachments offer different ways to move opponents. Side Sweeper knocks them sideways and spins them; Flip Fork launches them forward and briefly lifts them; Tow Hook catches the nearest opponent in its forward arc and yanks both machines toward each other. Activate them with Space and use the short burst to line up a hit or escape after committing.
+
 **[Play Rooftop / Rearmed](https://rooftoprage.rigster.cv/)**
 
 ## Run locally

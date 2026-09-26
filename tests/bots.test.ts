@@ -22,7 +22,7 @@ test('bots aim, approach, and fire only at live opponents in their forward arc',
   human.z = 2.4;
   input = botInput(bot, [bot, human]);
   assert.equal(input.front, true);
-  assert.equal(input.forward, 0);
+  assert.equal(input.forward, 1);
   human.z = -8;
   input = botInput(bot, [bot, human]);
   assert.equal(input.top, false);
@@ -33,6 +33,22 @@ test('bots aim, approach, and fire only at live opponents in their forward arc',
   bot.alive = false;
   human.alive = true;
   assert.deepEqual(botInput(bot, [bot, human]), EMPTY_INPUT);
+});
+
+test('pushing bots burst into aligned targets while respecting cooldown and roof edges', () => {
+  const { bot, human } = pair();
+  human.z = 5;
+  assert.equal(botInput(bot, [bot, human]).boost, true);
+  bot.boostCooldown = 1;
+  assert.equal(!!botInput(bot, [bot, human]).boost, false);
+  bot.boostCooldown = 0;
+  human.x = 5;
+  human.z = 0;
+  assert.equal(!!botInput(bot, [bot, human]).boost, false);
+  bot.z = ARENA_HALF - 4;
+  human.x = 0;
+  human.z = bot.z + 5;
+  assert.equal(!!botInput(bot, [bot, human]).boost, false);
 });
 
 test('bots stop driving outward at the edge and steer toward the center', () => {

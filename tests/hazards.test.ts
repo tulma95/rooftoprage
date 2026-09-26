@@ -24,6 +24,9 @@ test('tanks block shots, explode in chains, ignite oil and reset each round', ()
     sim.step(0.2);
   };
   shoot();
+  assert.equal(sim.state.tanks[0]!.hp, 24);
+  assert.equal(b!.hp, 100);
+  shoot();
   assert.equal(sim.state.tanks[0]!.hp, 12);
   assert.equal(b!.hp, 100);
   shoot();
