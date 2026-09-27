@@ -16,6 +16,18 @@ export interface HudView {
   message: string;
 }
 
+/** Fills the cooldown ring on the matching touch button (0 = just used, 1 = ready). */
+function touchReady(slot: string, ready: number) {
+  const button = document.querySelector<HTMLElement>(`[data-touch="${slot}"]`);
+  if (!button) return;
+  ready = Math.min(1, Math.max(0, ready));
+  button.style.setProperty('--ready', String(ready));
+  // A short buzz when a cooldown finishes, so readiness can be felt without looking.
+  if (ready >= 1 && button.classList.contains('cooling')) navigator.vibrate?.(8);
+  button.classList.toggle('ready', ready >= 1);
+  button.classList.toggle('cooling', ready < 1);
+}
+
 /** Persistent controls and meters; structural sections update only when their content changes. */
 export class BattleHud {
   private rosterSignature = '';
@@ -27,7 +39,7 @@ export class BattleHud {
   constructor(readonly element: HTMLElement) {
     element.innerHTML = `
       <div class="hud-roster glass"></div>
-      <div class="hud-timer glass"><strong></strong><span></span></div>
+      <div class="hud-timer glass"><strong></strong><span></span><div class="pips"></div></div>
       <div class="hud-menu">${button('menu', 'Menu / Esc')}<span class="connection"></span></div>
       <div class="hud-health glass"><span class="eyebrow"></span><strong><span></span> <small></small></strong><div class="meter"><i></i></div></div>
       <div class="hud-weapons"></div>
@@ -67,7 +79,17 @@ export class BattleHud {
             `<div><span class="swatch" style="background:${player.color}"></span><span>${escape(player.name)}</span><small>${player.alive ? 'ALIVE' : 'OUT'}</small></div>`,
         )
         .join('');
+      this.node('.pips').innerHTML = s.players
+        .map(
+          (player) =>
+            `<span class="pip${player.alive ? '' : ' out'}${player.id === sessionId ? ' me' : ''}"><i style="background:${player.color}"></i></span>`,
+        )
+        .join('');
     }
+    this.element.querySelectorAll<HTMLElement>('.pips i').forEach((bar, i) => {
+      const player = s.players[i];
+      if (player) bar.style.width = `${Math.max(0, player.hp / CHASSIS[player.chassis].hp) * 100}%`;
+    });
     const seconds = Math.ceil(s.remaining);
     this.text(
       '.hud-timer strong',
@@ -91,10 +113,18 @@ export class BattleHud {
       this.text('.hud-health strong span', Math.ceil(p.hp));
       this.text('.hud-health strong small', `/ ${maxHp} HP`);
       this.node('.hud-health').classList.toggle('low-health', p.hp < maxHp * 0.3);
+      this.node('.hud-health').classList.toggle(
+        'mid-health',
+        p.hp >= maxHp * 0.3 && p.hp < maxHp * 0.6,
+      );
       this.node('.hud-health .meter i').style.width = `${(p.hp / maxHp) * 100}%`;
       const weapons = `${p.front}/${p.top}/${spectator}`;
       if (weapons !== this.weaponSignature) {
         this.weaponSignature = weapons;
+        for (const slot of ['front', 'top'] as const) {
+          const icon = document.querySelector(`[data-touch="${slot}"] b`);
+          if (icon) icon.textContent = WEAPON_ICONS[p[slot]];
+        }
         this.node('.hud-weapons').innerHTML =
           (['front', 'top'] as const)
             .map(
@@ -115,6 +145,7 @@ export class BattleHud {
       );
       this.node('[data-slot="boost"] .meter i').style.width =
         `${Math.max(0, 1 - boostCooldown / BOOST_COOLDOWN) * 100}%`;
+      touchReady('boost', 1 - boostCooldown / BOOST_COOLDOWN);
       for (const slot of ['front', 'top'] as const) {
         const key = p[slot],
           cooldown = slot === 'front' ? p.frontCooldown : p.topCooldown;
@@ -130,8 +161,9 @@ export class BattleHud {
                 ? 'COOLING DOWN'
                 : 'READY',
         );
-        this.node(`[data-slot="${slot}"] .meter i`).style.width =
-          `${Math.min(100, (heat ? p.heat : cooldown / (WEAPONS[key].cooldown || 1)) * 100)}%`;
+        const spent = heat ? p.heat : cooldown / (WEAPONS[key].cooldown || 1);
+        this.node(`[data-slot="${slot}"] .meter i`).style.width = `${Math.min(100, spent * 100)}%`;
+        touchReady(slot, 1 - spent);
       }
     }
     this.visible('.spectator', spectator && s.phase === 'combat');

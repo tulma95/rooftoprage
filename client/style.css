@@ -77,6 +77,7 @@ button.primary:hover {
 }
 #app {
   position: relative;
+  padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);
   min-height: 100vh;
   pointer-events: none;
 }
@@ -832,4 +833,260 @@ body.cinematic::before {
 }
 body.cinematic::after {
   bottom: 0;
+}
+
+#touch-controls,
+.pips {
+  display: none;
+}
+@media (pointer: coarse) and (orientation: landscape) {
+  body.in-game:not(.cinematic) #touch-controls {
+    display: block;
+  }
+  #touch-controls {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+  /* Invisible thumb zone; the stick floats to wherever the thumb lands. */
+  #touch-controls .stick-zone {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 42%;
+    height: 62%;
+    pointer-events: auto;
+    touch-action: none;
+  }
+  #touch-controls .stick {
+    position: absolute;
+    left: max(40px, calc(env(safe-area-inset-left) + 16px));
+    top: calc(100% - 158px - env(safe-area-inset-bottom));
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    background: #111b2055;
+    border: 1.5px solid #ffffff55;
+    pointer-events: none;
+    transition: opacity 0.15s;
+    opacity: 0.25;
+  }
+  #touch-controls .stick.active {
+    opacity: 1;
+  }
+  #touch-controls .stick i {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 48px;
+    height: 48px;
+    margin: -24px;
+    border-radius: 50%;
+    background: #ffffffd9;
+    box-shadow:
+      0 0 0 3px #ecc05c66,
+      0 2px 10px #0006;
+  }
+  #touch-controls button {
+    position: absolute;
+    width: 64px;
+    height: 64px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    color: #e7e6df;
+    text-align: center;
+    line-height: 1;
+    background: #111b2099;
+    text-shadow: 0 1px 2px #000a;
+    box-shadow: 0 4px 14px #0005;
+    pointer-events: auto;
+    touch-action: none;
+    transition:
+      transform 0.15s,
+      box-shadow 0.15s;
+  }
+  /* The cooldown ring: a conic sweep masked down to the outer band. */
+  #touch-controls button::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(var(--accent) calc(var(--ready, 1) * 360deg), #ffffff1f 0);
+    -webkit-mask: radial-gradient(closest-side, #0000 80%, #000 82%);
+    mask: radial-gradient(closest-side, #0000 80%, #000 82%);
+  }
+  #touch-controls button b {
+    display: block;
+    font-size: 28px;
+    font-weight: 400;
+  }
+  #touch-controls button small {
+    display: block;
+    margin-top: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-indent: 0.12em;
+  }
+  #touch-controls button:not(.ready) :is(b, small) {
+    opacity: 0.6;
+  }
+  #touch-controls button.ready {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      0 0 18px var(--accent);
+    animation: ready-pop 0.15s ease-out;
+  }
+  #touch-controls button:active {
+    transform: scale(0.92);
+    background: var(--accent);
+    color: #111;
+  }
+  #touch-controls [data-touch='front'] {
+    width: 92px;
+    height: 92px;
+    right: max(28px, calc(env(safe-area-inset-right) + 12px));
+    bottom: calc(env(safe-area-inset-bottom) + 20px);
+  }
+  #touch-controls [data-touch='front'] b {
+    font-size: 36px;
+  }
+  #touch-controls [data-touch='top'] {
+    right: max(126px, calc(env(safe-area-inset-right) + 110px));
+    bottom: calc(env(safe-area-inset-bottom) + 16px);
+  }
+  #touch-controls [data-touch='boost'] {
+    right: max(108px, calc(env(safe-area-inset-right) + 92px));
+    bottom: calc(env(safe-area-inset-bottom) + 100px);
+  }
+  @keyframes ready-pop {
+    50% {
+      transform: scale(1.08);
+    }
+  }
+  /* Keyboard HUD panels overlap the thumbs on a phone; keep only the essentials. */
+  body.in-game .hud-weapons,
+  body.in-game .hud-roster,
+  body.in-game .hud-health .eyebrow,
+  body.in-game .hud-timer > span,
+  body.in-game .hud-health strong small,
+  body.in-game .connection.connected {
+    display: none;
+  }
+  body.in-game .glass {
+    border-radius: 12px;
+    background: #111b2080;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+  body.in-game .hud-health {
+    top: 10px;
+    bottom: auto;
+    left: max(12px, env(safe-area-inset-left));
+    height: 48px;
+    box-sizing: border-box;
+    padding: 4px 12px;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  body.in-game .hud-health strong {
+    font-size: 22px;
+    white-space: nowrap;
+  }
+  body.in-game .hud-health strong small {
+    font-size: 10px;
+  }
+  body.in-game .hud-health .meter i {
+    background: #7fd48a;
+  }
+  body.in-game .low-health strong {
+    color: #f07554;
+  }
+  body.in-game .hud-health .meter {
+    width: 88px;
+    height: 12px;
+    margin: 0;
+    border-radius: 6px;
+    background: #ffffff1f;
+    overflow: hidden;
+  }
+  body.in-game .mid-health .meter i {
+    background: #f0a04b;
+  }
+  body.in-game .low-health .meter i {
+    animation: low-pulse 0.8s ease-in-out infinite alternate;
+  }
+  @keyframes low-pulse {
+    to {
+      opacity: 0.4;
+    }
+  }
+  body.in-game .hud-timer {
+    top: 10px;
+    height: 48px;
+    box-sizing: border-box;
+    padding: 3px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  body.in-game .hud-timer strong {
+    font-size: 22px;
+    line-height: 1;
+  }
+  body.in-game .pips {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  body.in-game .pip {
+    width: 32px;
+    height: 8px;
+    border-radius: 4px;
+    background: #ffffff33;
+    overflow: hidden;
+  }
+  body.in-game .pip i {
+    display: block;
+    height: 100%;
+  }
+  body.in-game .pip.me {
+    outline: 1.5px solid #fff;
+    outline-offset: 1px;
+  }
+  body.in-game .pip.out {
+    background: none;
+    outline: 1px dashed #fff5;
+  }
+  body.in-game .pip.out i {
+    display: none;
+  }
+  body.in-game .hud-menu {
+    top: 10px;
+    right: max(12px, env(safe-area-inset-right));
+  }
+  /* Esc means nothing on a phone: show a compact pause icon, keep the text for screen readers. */
+  body.in-game .hud-menu [data-action='menu'] {
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    font-size: 0;
+    border-radius: 12px;
+    background: #111b2080;
+    /* Two CSS bars make an optically centred pause icon. */
+    background-image: linear-gradient(#e7e6df, #e7e6df), linear-gradient(#e7e6df, #e7e6df);
+    background-size: 4px 16px;
+    background-position:
+      calc(50% - 4px) 50%,
+      calc(50% + 4px) 50%;
+    background-repeat: no-repeat;
+  }
 }
