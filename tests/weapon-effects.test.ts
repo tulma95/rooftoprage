@@ -27,7 +27,7 @@ test('sustained effects keep scene objects and GPU resources fixed and recycle a
     effects.step(1 / 60);
     assert.ok(effects.sparks.count <= 256);
     assert.equal(
-      scene.children.filter((child) => child !== effects.sparks && child.visible).length,
+      scene.children.filter((child) => child !== effects.group && child.visible).length,
       20,
     );
   }
@@ -43,7 +43,7 @@ test('sustained effects keep scene objects and GPU resources fixed and recycle a
   effects.sync([]);
   effects.step(2);
   assert.equal(effects.sparks.count, 0);
-  assert.ok(children.every((child) => child === effects.sparks || !child.visible));
+  assert.ok(children.every((child) => child === effects.group || !child.visible));
   effects.burst(3, 4, true);
   effects.step(0);
   assert.equal(effects.sparks.count, 22);
@@ -61,18 +61,18 @@ test('projectile pools accommodate all four pilots and overlapping cannon volley
   ];
   effects.sync(volley);
   assert.equal(
-    scene.children.filter((child) => child !== effects.sparks && child.visible).length,
+    scene.children.filter((child) => child !== effects.group && child.visible).length,
     32,
   );
   const bolt = scene.children.find(
-    (child) => child !== effects.sparks && child.visible && child.position.x === 0,
+    (child) => child !== effects.group && child.visible && child.position.x === 0,
   )!;
   effects.sync([{ ...volley[0]!, x: 42 }]);
   assert.equal(bolt.position.x, 42);
   effects.clear();
   effects.sync(volley);
   assert.equal(
-    scene.children.filter((child) => child !== effects.sparks && child.visible).length,
+    scene.children.filter((child) => child !== effects.group && child.visible).length,
     32,
   );
 });

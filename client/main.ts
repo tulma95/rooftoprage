@@ -3,7 +3,7 @@ import { screenMarkup, settingsForm, help } from './screens.js';
 import { button } from './html.js';
 import { loadProfile, saveProfile } from './profile.js';
 import { KeyboardInput } from './input.js';
-import { tone } from './sound.js';
+import { playCombatSounds, stopCombatSounds } from './sound.js';
 import { sendClientMessage } from '../shared/protocol.js';
 import { ArenaSession, connectionError } from './session.js';
 import { isScreen, type Screen, type Modal } from './navigation.js';
@@ -163,26 +163,25 @@ const session = new ArenaSession(endpoint, {
     state = s;
     lastSnapshot = performance.now();
     online = true;
-    for (const e of s.events)
-      if (e.id > lastEvent) {
-        lastEvent = e.id;
-        const victim = s.players.find((p) => p.id === e.playerId),
-          attacker = s.players.find((p) => p.id === e.attackerId);
-        if (e.type === 'elimination') {
-          combatMessage = `${victim?.name ?? 'Robot'} ${e.reason}${attacker ? ` · ${attacker.name}` : ''}`;
-          combatMessageUntil = performance.now() + 3500;
-        } else if (
-          e.type === 'hit' &&
-          (e.playerId === joined.sessionId || e.attackerId === joined.sessionId)
-        ) {
-          if (performance.now() > combatMessageUntil) {
-            combatMessage = e.playerId === joined.sessionId ? 'Armor hit!' : 'Hit confirmed';
-            combatMessageUntil = performance.now() + 550;
-          }
-          tone(true, settings.audio);
-        } else if (e.type === 'shot' && e.playerId === joined.sessionId)
-          tone(false, settings.audio);
+    const fresh = s.events.filter((e) => e.id > lastEvent);
+    for (const e of fresh) {
+      lastEvent = e.id;
+      const victim = s.players.find((p) => p.id === e.playerId),
+        attacker = s.players.find((p) => p.id === e.attackerId);
+      if (e.type === 'elimination') {
+        combatMessage = `${victim?.name ?? 'Robot'} ${e.reason}${attacker ? ` · ${attacker.name}` : ''}`;
+        combatMessageUntil = performance.now() + 3500;
+      } else if (
+        e.type === 'hit' &&
+        (e.playerId === joined.sessionId || e.attackerId === joined.sessionId)
+      ) {
+        if (performance.now() > combatMessageUntil) {
+          combatMessage = e.playerId === joined.sessionId ? 'Armor hit!' : 'Hit confirmed';
+          combatMessageUntil = performance.now() + 550;
+        }
       }
+    }
+    playCombatSounds(s, fresh, watched(), settings.audio);
     scene.update(s, joined.sessionId, input, watched()?.id);
     if (s.phase !== lastPhase) {
       lastPhase = s.phase;
@@ -206,6 +205,7 @@ const session = new ArenaSession(endpoint, {
     room = null;
     state = null;
     controls.clear();
+    stopCombatSounds();
     screen = 'play';
     error =
       'Connection lost. Your robot cannot rejoin the ongoing round. Create or join another room.';
@@ -232,6 +232,7 @@ async function leave(to: Screen = 'play') {
   state = null;
   modal = '';
   controls.clear();
+  stopCombatSounds();
   scene.update(null, '', EMPTY_INPUT);
   await session.leave();
   navigate(to);

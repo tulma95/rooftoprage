@@ -37,7 +37,8 @@ interface Robot {
   barrel: THREE.Group;
   muzzle: THREE.Object3D;
   burn: THREE.Group;
-  flame: THREE.Group;
+  /** Flamethrower stream on; the stream itself is pooled particles. */
+  firing: boolean;
   front: FrontWeapon;
   top: TopWeapon;
   speed: number;
@@ -48,9 +49,41 @@ interface Robot {
   meleeConnected: boolean;
   lastFrontCooldown: number;
   contactCooldown: number;
+  /** Throttles flame-damage scorch effects separately from grinding contact. */
+  scorchCooldown: number;
+  /** Remaining time of the short slam into the contact pose, and the pose it started from. */
+  slam: number;
+  slamFrom: number;
   flash: number;
   kick: THREE.Vector2;
   trailClock: number;
+  /** Barrel heat from sustained fire, 0..1; drives the barrel glow and smoke wisps. */
+  heat: number;
+  /** Heat-glowing barrel material; the railgun's energy coils. */
+  hot: THREE.MeshStandardMaterial;
+  /** Spinner spin-up, 0..1. */
+  spin: number;
+  /** Motion-blur shells on spinning attachments, faded in with spin. */
+  blur: THREE.MeshBasicMaterial[];
+}
+const backOut = (t: number) => 1 + 2.70158 * (t - 1) ** 3 + 1.70158 * (t - 1) ** 2;
+const FOV = 48;
+const SLAM = 0.04;
+/** Barrel heat added per shot; the flamethrower reports its heat from the server. */
+const SHOT_HEAT: Record<TopWeapon, number> = {
+  cannon: 0.3,
+  scattergun: 0.26,
+  railgun: 0.45,
+  flamethrower: 0,
+};
+/** A swinging attachment's animated channel and its pose at contact. */
+function attachmentPose(
+  r: Robot,
+): [THREE.Euler | THREE.Vector3, 'x' | 'y' | 'z', number] | undefined {
+  if (r.hammer) return [r.hammer.rotation, 'x', 0.45];
+  if (r.sweeper) return [r.sweeper.rotation, 'y', 0.85];
+  if (r.flipper) return [r.flipper.rotation, 'x', -1.12];
+  if (r.hook) return [r.hook.position, 'z', 2.17];
 }
 const steel = new THREE.MeshStandardMaterial({ color: '#3c4444', roughness: 0.78, metalness: 0.7 });
 const dark = new THREE.MeshStandardMaterial({ color: '#171d1c', roughness: 0.85, metalness: 0.4 });
@@ -419,13 +452,30 @@ function robot(
     flight.castShadow = true;
     drill.add(flight);
   }
+  const hot = new THREE.MeshStandardMaterial(
+    top === 'railgun'
+      ? {
+          color: '#65e5ed',
+          emissive: '#20cadd',
+          emissiveIntensity: 2,
+          metalness: 0.4,
+          roughness: 0.3,
+        }
+      : {
+          color: '#3c4444',
+          roughness: 0.78,
+          metalness: 0.7,
+          emissive: '#ff4a14',
+          emissiveIntensity: 0,
+        },
+  );
   const barrel = new THREE.Group();
   barrel.position.set(0, turretY, -0.13);
   group.add(barrel);
   cylinder(barrel, 0, 0, 0, 0.43, 0.16, dark);
   if (top === 'cannon') {
     box(barrel, 0, 0.22, 0.04, 0.67, 0.36, 0.66, paint);
-    cylinder(barrel, 0, 0.22, 0.68, 0.14, 1.05, steel, 'z');
+    cylinder(barrel, 0, 0.22, 0.68, 0.14, 1.05, hot, 'z');
     cylinder(barrel, 0, 0.22, 1.2, 0.2, 0.23, silver, 'z');
     cylinder(barrel, 0, 0.22, 1.322, 0.14, 0.015, dark, 'z');
     box(barrel, 0.39, 0.2, -0.02, 0.18, 0.28, 0.47, steel);
@@ -434,7 +484,7 @@ function robot(
       cylinder(barrel, x, 0.21, -0.1, 0.22, 0.74, paint, 'z');
       cylinder(barrel, x, 0.21, -0.45, 0.15, 0.12, dark, 'z');
     }
-    cylinder(barrel, 0, 0.18, 0.55, 0.22, 0.85, steel, 'z');
+    cylinder(barrel, 0, 0.18, 0.55, 0.22, 0.85, hot, 'z');
     cylinder(barrel, 0, 0.18, 0.99, 0.28, 0.15, silver, 'z');
     for (const x of [-0.15, 0.15]) cylinder(barrel, x, 0.18, 1.08, 0.08, 0.04, dark, 'z');
   } else if (top === 'scattergun') {
@@ -447,7 +497,7 @@ function robot(
       [-0.12, 0.34],
       [0.12, 0.34],
     ]) {
-      cylinder(barrel, x!, y!, 0.7, 0.1, 0.59, steel, 'z');
+      cylinder(barrel, x!, y!, 0.7, 0.1, 0.59, hot, 'z');
       cylinder(barrel, x!, y!, 1.005, 0.074, 0.02, dark, 'z');
     }
     for (const x of [-0.54, 0.54]) {
@@ -456,21 +506,14 @@ function robot(
         cylinder(barrel, x, 0.4, -0.17 + i * 0.14, 0.05, 0.16, silver, 'x');
     }
   } else if (top === 'railgun') {
-    const energy = new THREE.MeshStandardMaterial({
-      color: '#65e5ed',
-      emissive: '#20cadd',
-      emissiveIntensity: 2,
-      metalness: 0.4,
-      roughness: 0.3,
-    });
     box(barrel, 0, 0.22, -0.09, 0.71, 0.35, 0.59, paint);
     box(barrel, 0, 0.14, 0.64, 0.49, 0.13, 1.6, dark);
     for (const x of [-0.24, 0.24]) {
       box(barrel, x, 0.31, 0.72, 0.14, 0.22, 1.65, silver);
-      box(barrel, x * 0.72, 0.3, 0.75, 0.045, 0.09, 1.48, energy);
-      for (let i = 0; i < 4; i++) box(barrel, x, 0.32, 0.18 + i * 0.27, 0.22, 0.3, 0.055, energy);
+      box(barrel, x * 0.72, 0.3, 0.75, 0.045, 0.09, 1.48, hot);
+      for (let i = 0; i < 4; i++) box(barrel, x, 0.32, 0.18 + i * 0.27, 0.22, 0.3, 0.055, hot);
     }
-    cylinder(barrel, 0, 0.26, -0.48, 0.22, 0.18, energy, 'z');
+    cylinder(barrel, 0, 0.26, -0.48, 0.22, 0.18, hot, 'z');
   }
   // Barrel tip, so flashes and flames follow each chassis' turret height, scale and recoil.
   const muzzle = new THREE.Object3D();
@@ -480,9 +523,8 @@ function robot(
     { cannon: 1.33, flamethrower: 1.08, scattergun: 1.0, railgun: 1.52 }[top],
   );
   barrel.add(muzzle);
-  const flame = new THREE.Group();
-  flame.position.set(0, turretY + 0.19, 1);
-  group.add(flame);
+  // Flames licking off a burning robot.
+  const burn = new THREE.Group();
   for (let i = 0; i < 7; i++) {
     const m = new THREE.Mesh(
       new THREE.IcosahedronGeometry(0.22 + i * 0.065, 0),
@@ -493,10 +535,9 @@ function robot(
       }),
     );
     m.position.z = i * 0.55;
-    flame.add(m);
+    burn.add(m);
   }
-  flame.visible = false;
-  const burn = flame.clone();
+  burn.visible = false;
   burn.position.set(0, 0.5, -0.4);
   burn.rotation.x = -Math.PI / 2;
   burn.scale.setScalar(0.65);
@@ -508,6 +549,46 @@ function robot(
   mergeStatic(runningGear, wheels);
   for (const part of [saw, hammer, drill, sweeper, flipper, hook, barrel])
     if (part) mergeStatic(part);
+  // Added after merging so the blur shells keep their own fading materials and cast no shadow.
+  const blur: THREE.MeshBasicMaterial[] = [];
+  const shell = (
+    parent: THREE.Object3D,
+    geometry: THREE.BufferGeometry,
+    color: string,
+    max: number,
+    additive = false,
+  ) => {
+    const material = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+    });
+    material.userData.max = max;
+    blur.push(material);
+    const mesh = new THREE.Mesh(geometry, material);
+    parent.add(mesh);
+    return mesh;
+  };
+  if (saw) {
+    shell(saw, new THREE.CylinderGeometry(0.74, 0.74, 0.13, 40), '#c3ccca', 0.6);
+    shell(
+      saw,
+      new THREE.RingGeometry(0.5, 0.8, 48).rotateX(-Math.PI / 2),
+      '#ff9c45',
+      0.9,
+      true,
+    ).position.y = 0.07;
+  }
+  if (drill)
+    shell(
+      drill,
+      new THREE.ConeGeometry(0.5, 1.2, 24).rotateX(Math.PI / 2).translate(0, 0, 0.57),
+      '#b7c1bf',
+      0.5,
+    );
   group.scale.setScalar(chassisScale(chassis));
   return {
     suspension,
@@ -524,7 +605,7 @@ function robot(
     hook,
     barrel,
     muzzle,
-    flame,
+    firing: false,
     front,
     top,
     speed: 0,
@@ -535,15 +616,22 @@ function robot(
     meleeConnected: false,
     lastFrontCooldown: 0,
     contactCooldown: 0,
+    scorchCooldown: 0,
+    slam: 0,
+    slamFrom: 0,
     flash: 0,
     kick: new THREE.Vector2(),
     trailClock: 0,
+    heat: 0,
+    hot,
+    spin: 0,
+    blur,
   };
 }
 
 export class GameScene {
   private scene = new THREE.Scene();
-  private camera = new THREE.PerspectiveCamera(48, 1, 0.1, 650);
+  private camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 650);
   private renderer: THREE.WebGLRenderer;
   private robots = new Map<string, Robot>();
   private previewRobot: Robot;
@@ -556,6 +644,14 @@ export class GameScene {
   private timer = new THREE.Timer();
   private shakeEnabled = true;
   private shake = 0;
+  /** Client-only freeze-frame: effects nearly pause for a few frames after heavy hits. */
+  private hitStop = 0;
+  /** Hit-stop waits for the attacker's slam to land. */
+  private hitStopDelay = 0;
+  /** 0.1 during hit-stop, else 1; scales robot interpolation, animation and effects. */
+  private timeScale = 1;
+  /** Momentary zoom-in on heavy hits, 0..1. */
+  private punch = 0;
   private city = new City();
   private hazards = new ArenaHazards();
   private effects: WeaponEffects;
@@ -671,7 +767,7 @@ export class GameScene {
         this.seenEvents.clear();
         this.effects.clear();
         this.wow.clear();
-        this.shake = 0;
+        this.shake = this.hitStop = this.hitStopDelay = this.punch = 0;
       }
       if (
         state &&
@@ -682,6 +778,7 @@ export class GameScene {
           const r = this.robots.get(p.id);
           if (r) {
             r.meleeHold = r.contactCooldown = r.flash = r.trailClock = r.impact = 0;
+            r.heat = r.spin = r.scorchCooldown = r.slam = 0;
             r.meleeConnected = false;
             r.lastFrontCooldown = 0;
             r.kick.set(0, 0);
@@ -728,11 +825,13 @@ export class GameScene {
     for (const m of materials)
       if (![steel, dark, silver, rubber].includes(m as THREE.MeshStandardMaterial)) m.dispose();
   }
-  private animateRobot(r: Robot, p: PlayerState | undefined, time: number, dt: number): void {
+  private animateRobot(r: Robot, p: PlayerState | undefined, time: number, realDt: number): void {
+    const dt = realDt * this.timeScale;
     const lift = Math.min(1, (p?.lifted ?? 0) / 0.15);
     r.group.rotation.x += (-lift * 0.16 - r.group.rotation.x) * (1 - Math.exp(-dt * 16));
     r.group.rotation.z = 0;
     r.contactCooldown = Math.max(0, r.contactCooldown - dt);
+    r.scorchCooldown = Math.max(0, r.scorchCooldown - dt);
     r.flash = Math.max(0, r.flash - dt);
     r.paint.emissiveIntensity = (r.flash / 0.09) * 1.8;
     r.kick.multiplyScalar(Math.exp(-dt * 18));
@@ -747,42 +846,74 @@ export class GameScene {
       r.suspension.rotation.x += 0.045;
       r.suspension.position.y -= 0.035;
     }
-    for (const w of r.wheels) w.rotation.x += (dt * r.speed) / r.wheelRadius;
+    for (const w of r.wheels) w.rotation.x += (realDt * r.speed) / r.wheelRadius;
+    // Spinners wind up over ~0.4 s and coast down; blur shells hide the teeth at speed.
+    const spinning = !!p?.frontActive && (!!r.saw || !!r.drill);
+    r.spin += ((spinning ? 1 : 0) - r.spin) * (1 - Math.exp(-dt * (spinning ? 5 : 1.5)));
+    for (const m of r.blur) m.opacity = (m.userData.max as number) * r.spin * r.spin;
     if ((p?.frontCooldown ?? 0) > r.lastFrontCooldown + 0.05) r.meleeConnected = false;
     r.lastFrontCooldown = p?.frontCooldown ?? 0;
-    if (r.meleeHold > 0) r.meleeHold = Math.max(0, r.meleeHold - dt);
+    const pose = attachmentPose(r);
+    if (r.slam > 0 && pose) {
+      // The slam plays in real time so it lands before the hit-stop begins.
+      r.slam = Math.max(0, r.slam - realDt);
+      const k = (1 - r.slam / SLAM) ** 2;
+      pose[0][pose[1]] = r.slamFrom + (pose[2] - r.slamFrom) * k;
+    } else if (r.meleeHold > 0) r.meleeHold = Math.max(0, r.meleeHold - dt);
     else this.animateMelee(r, p, dt);
     r.burn.visible = !!p?.burning;
-    r.flame.visible = !!p?.topActive && r.top === 'flamethrower';
-    if (r.flame.visible && p?.alive) {
+    r.firing = !!p?.topActive && r.top === 'flamethrower';
+    if (r.firing && p?.alive) {
       const tip = r.muzzle.getWorldPosition(this.muzzlePoint);
       this.effects.flame(tip.x, tip.y, tip.z, r.group.rotation.y, dt);
     }
-    r.flame.children.forEach((o, i) => {
-      o.scale.setScalar(1 + Math.sin(time * 35 + i) * 0.2);
-      o.rotation.z = time * 6 + i;
-    });
     const cooldown = WEAPONS[r.top].cooldown,
-      elapsed = cooldown - (p?.topCooldown ?? 0);
-    r.barrel.position.z =
-      -0.13 -
-      (cooldown > 0 && p && p.topCooldown > 0
-        ? Math.max(0, 1 - elapsed / 0.16) *
-          (r.top === 'cannon' ? 0.42 : r.top === 'scattergun' ? 0.3 : 0.18)
-        : 0);
+      elapsed = cooldown - (p?.topCooldown ?? 0) + this.snapshotAge();
+    // Sharp kick, then a damped spring that overshoots slightly forward before settling.
+    const settle = elapsed - 0.025;
+    const recoil =
+      cooldown > 0 && p && p.topCooldown > 0
+        ? settle < 0
+          ? elapsed / 0.025
+          : Math.exp(-settle * 11) * Math.cos(settle * 20)
+        : 0;
+    const heavy = r.top === 'cannon' ? 1 : r.top === 'scattergun' ? 0.72 : 0.42;
+    r.barrel.position.z = -0.13 - recoil * 0.42 * heavy;
+    r.barrel.rotation.x = -recoil * 0.14 * heavy;
+    r.barrel.position.x = r.firing ? Math.sin(time * 83) * 0.012 : 0;
+    // Gun heat builds per shot and bleeds off over ~8 s; the flamethrower's is authoritative.
+    if (r.top === 'flamethrower') r.heat = p?.heat ?? 0;
+    else r.heat = Math.min(1, Math.max(0, r.heat - dt * 0.12));
+    if (r.top === 'railgun') {
+      // Coils dim after a shot, recharge, then pulse when ready.
+      const ready = p && p.topCooldown > 0 ? 1 - p.topCooldown / cooldown : 1;
+      r.hot.emissiveIntensity =
+        0.4 + 1.6 * ready * ready + (ready >= 1 ? Math.sin(time * 6) * 0.35 : 0) + r.heat * 2;
+    } else r.hot.emissiveIntensity = Math.max(0, (r.heat - 0.35) / 0.65) ** 1.5 * 4; // Sustained fire only.
+    // An overheated flamethrower vents steam until it cools.
+    const vent = !!p?.overheated;
+    if (p?.alive && (vent || r.heat > 0.45) && Math.random() < dt * (vent ? 14 : r.heat * 10)) {
+      const tip = r.muzzle.getWorldPosition(this.muzzlePoint);
+      this.effects.heatWisp(tip.x, tip.y, tip.z, vent);
+    }
+  }
+  private snapshotAge(): number {
+    return Math.min(Math.max(0, (performance.now() - this.lastSnapshot) / 1000), TICK_SECONDS);
   }
   private animateMelee(r: Robot, p: PlayerState | undefined, dt: number): void {
     if (!p || p.frontCooldown <= 0) r.meleeConnected = false;
-    if (r.saw) r.saw.rotation.y += dt * (p?.frontActive ? 35 : 3);
-    if (r.drill) r.drill.rotation.z += dt * (p?.frontActive ? 29 : 2.2);
+    if (r.saw) r.saw.rotation.y += dt * (3 + 36 * r.spin);
+    if (r.drill) r.drill.rotation.z += dt * (2.2 + 30 * r.spin);
     // Advance between server ticks so quick swings still move every frame.
-    const snapshotAge = Math.min(
-      Math.max(0, (performance.now() - this.lastSnapshot) / 1000),
-      TICK_SECONDS,
-    );
+    const snapshotAge = this.snapshotAge();
     if (r.sweeper || r.flipper || r.hook) {
       const elapsed = WEAPONS[r.front].cooldown - (p?.frontCooldown ?? 0) + snapshotAge;
-      const strike = r.meleeConnected ? 1 : Math.min(1, Math.max(0, elapsed / 0.12));
+      // A brief pull-back, then a snap that overshoots its contact pose.
+      const strike = r.meleeConnected
+        ? 1
+        : elapsed < 0.04
+          ? -0.18 * (elapsed / 0.04)
+          : -0.18 + 1.18 * backOut(Math.min(1, (elapsed - 0.04) / 0.1));
       const recovery = Math.min(1, Math.max(0, (elapsed - 0.2) / 0.42));
       const action =
         p && p.frontCooldown > 0 ? strike * (1 - recovery * recovery * (3 - 2 * recovery)) : 0;
@@ -792,10 +923,18 @@ export class GameScene {
     }
     if (r.hammer) {
       const elapsed = WEAPONS.hammer.cooldown - (p?.frontCooldown ?? 0) + snapshotAge;
-      const down = r.meleeConnected ? 1 : Math.min(1, Math.max(0, elapsed / 0.18));
+      // Anticipation: rear back 0.06 s, slam in 0.1 s, then a ringing bounce when it misses.
+      const slam = Math.min(1, Math.max(0, (elapsed - 0.06) / 0.1));
+      const ring = elapsed - 0.16;
       const up = Math.min(1, Math.max(0, (elapsed - 0.26) / 1.1));
-      r.hammer.rotation.x =
-        p && p.frontCooldown > 0 ? -1 + 1.55 * down * down - 1.55 * up * up * (3 - 2 * up) : -1;
+      const pose = r.meleeConnected
+        ? 0.55
+        : elapsed < 0.06
+          ? -1 - 0.4 * Math.sin((elapsed / 0.06) * (Math.PI / 2))
+          : -1.4 +
+            1.95 * slam ** 3 +
+            (ring > 0 ? Math.sin(ring * 40) * Math.exp(-ring * 18) * 0.12 : 0);
+      r.hammer.rotation.x = p && p.frontCooldown > 0 ? pose - 1.55 * up * up * (3 - 2 * up) : -1;
     }
     const attachment = r.hammer ?? r.sweeper ?? r.flipper ?? r.hook;
     const elapsed = WEAPONS[r.front].cooldown - (p?.frontCooldown ?? 0);
@@ -895,7 +1034,7 @@ export class GameScene {
             6.4 + vertigo * 4,
             pos.z - Math.cos(yaw) * (9 - vertigo * 3),
           ),
-          1 - Math.exp(-dt * 6),
+          1 - Math.exp(-dt * this.timeScale * 6),
         );
         this.target.lerp(
           this.goal.set(
@@ -903,7 +1042,7 @@ export class GameScene {
             0.6 - vertigo * 9,
             pos.z + Math.cos(yaw) * (3 + vertigo * 5),
           ),
-          1 - Math.exp(-dt * 10),
+          1 - Math.exp(-dt * this.timeScale * 10),
         );
         if (watched?.id === this.localId)
           this.aim = this.aimPoint.set(
@@ -936,14 +1075,16 @@ export class GameScene {
             victim.impact = Math.min(1.5, victim.impact + strength * 5);
             victim.impactAge = 0;
             // Hold only the attachment at its contact pose; driving and the server keep running.
+            // Contact often arrives on the swing's first tick: slam in over 40 ms, then hold.
             if (!grinding) {
               attacker.meleeConnected = true;
               attacker.meleeHold = event.melee === 'hammer' ? 0.065 : 0.04;
               attacker.kick.x = -strength * 0.45;
-              if (attacker.hammer) attacker.hammer.rotation.x = 0.45;
-              if (attacker.sweeper) attacker.sweeper.rotation.y = 0.85;
-              if (attacker.flipper) attacker.flipper.rotation.x = -1.12;
-              if (attacker.hook) attacker.hook.position.z = 2.17;
+              const pose = attachmentPose(attacker);
+              if (pose) {
+                attacker.slamFrom = pose[0][pose[1]];
+                attacker.slam = SLAM;
+              }
             }
             const a = attacker.group.position,
               b = victim.group.position;
@@ -961,27 +1102,60 @@ export class GameScene {
                 1 - Math.hypot(event.x - watched.x, event.z - watched.z) / 18,
               );
               this.shake = Math.min(0.24, this.shake + proximity * strength);
+              if (event.melee === 'hammer') {
+                this.hitStop = Math.max(this.hitStop, 0.06 * proximity);
+                this.hitStopDelay = SLAM;
+                this.punch = Math.min(1, this.punch + proximity);
+              }
             }
+            continue;
+          }
+          // Flame damage arrives every tick: throttle it to scorch embers without flares.
+          if (
+            event.type === 'hit' &&
+            attacker?.top === 'flamethrower' &&
+            event.reason !== 'collision' &&
+            victim
+          ) {
+            if (victim.scorchCooldown > 0) continue;
+            victim.scorchCooldown = 0.12;
+            victim.flash = 0.035;
+            this.effects.scorch(event.x, victim.group.scale.x, event.z);
             continue;
           }
           if (victim && (event.type === 'hit' || event.type === 'shot')) {
             victim.impact = Math.min(1.5, victim.impact + (event.type === 'hit' ? 0.9 : 0.35));
             victim.impactAge = 0;
           }
+          const big = event.type === 'elimination' || event.type === 'explosion';
+          const railHit = event.type === 'hit' && attacker?.top === 'railgun';
           if (event.type !== 'shot' && watched) {
-            const distance = Math.hypot(event.x - watched.x, event.z - watched.z);
-            this.shake = Math.min(0.24, this.shake + Math.max(0, 1 - distance / 20) * 0.16);
+            const proximity = Math.max(
+              0,
+              1 - Math.hypot(event.x - watched.x, event.z - watched.z) / 20,
+            );
+            this.shake = Math.min(0.24, this.shake + proximity * (big ? 0.24 : 0.16));
+            if (big || railHit) {
+              this.hitStop = Math.max(this.hitStop, (big ? 0.09 : 0.05) * proximity);
+              this.punch = Math.min(1, this.punch + proximity * (big ? 1 : 0.6));
+            }
           }
           if (event.type === 'shot' && victim) {
             const tip = victim.muzzle.getWorldPosition(this.muzzlePoint);
             this.effects.shot(tip.x, tip.y, tip.z, victim.group.rotation.y, victim.top);
+            const kick = SHOT_HEAT[victim.top];
+            victim.heat = Math.min(1, victim.heat + kick);
+            // Firing jolts your own camera a little.
+            if (watched?.id === event.playerId)
+              this.shake = Math.min(0.24, this.shake + kick * 0.2);
           } else {
             const y = victim?.group.scale.x ?? 1;
             this.effects.impact(
               event.x,
               event.z,
-              event.type === 'elimination' || event.type === 'explosion',
+              big,
               y,
+              event.type === 'hit' && event.reason !== 'collision' ? attacker?.top : undefined,
             );
             this.wow.impact(event.x, event.z, event.type, y);
           }
@@ -1011,9 +1185,18 @@ export class GameScene {
       this.target,
     );
     if (this.finale.active) this.aim = null;
-    this.effects.step(dt);
-    this.wow.step(dt);
+    this.effects.step(dt * this.timeScale);
+    this.wow.step(dt * this.timeScale);
+    if (this.hitStopDelay > 0) this.hitStopDelay = Math.max(0, this.hitStopDelay - dt);
+    else this.hitStop = Math.max(0, this.hitStop - dt);
+    this.timeScale = this.hitStop > 0 && this.hitStopDelay === 0 ? 0.1 : 1;
     this.shake *= Math.exp(-dt * 13);
+    this.punch *= Math.exp(-dt * 9);
+    const fov = FOV * (1 - (combat && this.shakeEnabled ? this.punch * 0.05 : 0));
+    if (this.camera.fov !== fov) {
+      this.camera.fov = fov;
+      this.camera.updateProjectionMatrix();
+    }
     this.camera.lookAt(this.target);
     // Offset only the rendered view, avoiding drift in the follow-camera position.
     if (combat && this.shakeEnabled) {

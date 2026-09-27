@@ -77,8 +77,8 @@ try {
   await page.screenshot({ path: 'artifacts/weapon-effects.png' });
   assert.deepEqual(result.sustained, result.warm, 'sustained fire must not allocate GPU resources');
   assert.ok(
-    result.peakCalls <= result.idleCalls + 21,
-    '20 pellets and the entire spark batch need at most 21 draw calls',
+    result.peakCalls <= result.idleCalls + 24,
+    '20 pellets and the four particle batches need at most 24 draw calls',
   );
   assert.equal(result.clearedSparks, 0);
   assert.deepEqual(errors, []);

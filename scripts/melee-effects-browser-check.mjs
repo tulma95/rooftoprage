@@ -60,6 +60,8 @@ try {
       game.frame();
       const hold = attacker.meleeHold;
       const flash = victim.flash;
+      // The attachment slams into its contact pose over 40 ms before holding it.
+      while (attacker.slam > 0) game.frame();
       const pose = attacker.hammer?.rotation.x;
       const x = attacker.group.position.x;
       a.x = 0.5;
