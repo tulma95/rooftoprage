@@ -118,6 +118,14 @@ export class KeyboardInput {
       button.addEventListener('pointercancel', up);
     }
     root.addEventListener('contextmenu', (e) => e.preventDefault());
+    // First thumb on the controls hides the browser chrome. iPhone Safari has no element
+    // fullscreen, so there it's a no-op; "Add to Home Screen" gives a chrome-less app instead.
+    root.addEventListener('pointerdown', () => {
+      const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void };
+      if (document.fullscreenElement) return;
+      if (el.requestFullscreen) el.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+      else el.webkitRequestFullscreen?.();
+    });
   }
 
   clear() {

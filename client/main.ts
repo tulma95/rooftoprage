@@ -3,7 +3,7 @@ import { screenMarkup, settingsForm, help } from './screens.js';
 import { button } from './html.js';
 import { loadProfile, saveProfile } from './profile.js';
 import { KeyboardInput } from './input.js';
-import { playCombatSounds, stopCombatSounds } from './sound.js';
+import { installUiSounds, playCombatSounds, stopCombatSounds } from './sound.js';
 import { sendClientMessage } from '../shared/protocol.js';
 import { ArenaSession, connectionError } from './session.js';
 import { isScreen, type Screen, type Modal } from './navigation.js';
@@ -54,7 +54,8 @@ let busy = false,
   lastEvent = 0,
   combatMessage = '',
   combatMessageUntil = 0,
-  saveError = '';
+  saveError = '',
+  renderedScreen = '';
 const controls = new KeyboardInput(playing, () => {
   modal = modal ? '' : 'menu';
   renderModal();
@@ -71,6 +72,7 @@ function applySettings() {
   document.body.classList.toggle('high-contrast', settings.contrast);
 }
 applySettings();
+installUiSounds(() => settings.audio);
 function local() {
   return state?.players.find((p) => p.id === room?.sessionId);
 }
@@ -104,6 +106,7 @@ function render() {
     }
     renderHud();
     renderModal();
+    renderedScreen = '';
     return;
   }
   hud = null;
@@ -131,6 +134,9 @@ function render() {
     inviteCode: new URLSearchParams(location.search).get('room') || '',
     touchOnly: !matchMedia('(any-pointer: fine)').matches,
   });
+  // Entry animations play only when the screen changes, not on every re-render.
+  if (screen === renderedScreen) app.querySelector('.shell')?.classList.add('same');
+  renderedScreen = screen;
   if (focusKey) app.querySelector<HTMLElement>(focusKey)?.focus();
 }
 function renderHud() {
@@ -166,21 +172,13 @@ const session = new ArenaSession(endpoint, {
     const fresh = s.events.filter((e) => e.id > lastEvent);
     for (const e of fresh) {
       lastEvent = e.id;
-      const victim = s.players.find((p) => p.id === e.playerId),
-        attacker = s.players.find((p) => p.id === e.attackerId);
-      if (e.type === 'elimination') {
-        combatMessage = `${victim?.name ?? 'Robot'} ${e.reason}${attacker ? ` · ${attacker.name}` : ''}`;
+      if (e.type === 'elimination' && e.playerId === joined.sessionId) {
+        const attacker = s.players.find((p) => p.id === e.attackerId);
+        combatMessage = `${e.reason === 'destroyed' ? 'Destroyed' : e.reason === 'fell off the roof' ? 'Knocked off the roof' : 'Eliminated'}${attacker ? ` by ${attacker.name}` : ''}`;
         combatMessageUntil = performance.now() + 3500;
-      } else if (
-        e.type === 'hit' &&
-        (e.playerId === joined.sessionId || e.attackerId === joined.sessionId)
-      ) {
-        if (performance.now() > combatMessageUntil) {
-          combatMessage = e.playerId === joined.sessionId ? 'Armor hit!' : 'Hit confirmed';
-          combatMessageUntil = performance.now() + 550;
-        }
       }
     }
+    hud?.events(fresh, s, joined.sessionId, watched());
     playCombatSounds(s, fresh, watched(), settings.audio);
     scene.update(s, joined.sessionId, input, watched()?.id);
     if (s.phase !== lastPhase) {

@@ -54,13 +54,18 @@ try {
       const robot = scene.robots.get('a');
       lowestRoot = Math.min(lowestRoot, robot.group.position.y);
       lowestBody = Math.min(lowestBody, robot.suspension.position.y);
+      // Relative to the scaled resting height: chassis scale shrinks lighter robots' wheels.
       for (const wheel of robot.wheels)
-        lowestWheel = Math.min(lowestWheel, wheel.getWorldPosition(wheel.position.clone()).y);
+        lowestWheel = Math.min(
+          lowestWheel,
+          wheel.getWorldPosition(wheel.position.clone()).y /
+            (robot.wheelRadius * robot.group.scale.y),
+        );
     }
     return { lowestRoot, lowestWheel, lowestBody };
   });
   assert.ok(grounding.lowestRoot >= 0, 'Repeated hits must not lower the robot root');
-  assert.ok(grounding.lowestWheel >= 0.449, 'Wheel centers must remain at their resting height');
+  assert.ok(grounding.lowestWheel >= 0.976, 'Wheel centers must remain at their resting height');
   assert.ok(grounding.lowestBody >= -0.031, 'Suspension compression must stay bounded');
   await page.evaluate(() => {
     const { scene, state, input } = window.visual;

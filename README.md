@@ -56,3 +56,5 @@ Run a single game server instance. Rooms are kept in memory, so restarting or de
 ## Credits
 
 Inspired by the RobotRage genre, with original procedural models, effects, and music. Dependencies retain their respective licenses. Barlow Condensed and IBM Plex Sans are provided through Google Fonts under the SIL Open Font License.
+
+Scanned PBR textures and the sky HDRI are from [Poly Haven](https://polyhaven.com) under CC0 1.0 (public domain): concrete_floor_worn_001, blue_metal_plate, rust_coarse_01, rusty_metal_04, rubberized_track, concrete_wall_008 and belfast_sunset_puresky. See `client/assets.ts`.

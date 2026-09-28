@@ -40,7 +40,12 @@ export class Finale {
   private goal = new THREE.Vector3();
   private debris = new THREE.InstancedMesh(
     new THREE.BoxGeometry(0.22, 0.12, 0.4),
-    new THREE.MeshStandardMaterial({ color: '#9bada8', metalness: 0.7, roughness: 0.4 }),
+    new THREE.MeshStandardMaterial({
+      color: '#7d8783',
+      metalness: 0.8,
+      roughness: 0.45,
+      emissive: '#ff5a14',
+    }),
     18,
   );
   private transform = new THREE.Object3D();
@@ -104,6 +109,8 @@ export class Finale {
     this.goal.y += 0.6;
     target.lerp(this.goal, 1 - Math.exp(-dt * 8));
     this.debris.visible = true;
+    // Torn-off chunks leave white-hot and cool to bare steel.
+    this.debris.material.emissiveIntensity = 4 * Math.max(0, 1 - this.elapsed / 1.6) ** 2;
     for (let i = 0; i < 18; i++) {
       const angle = i * 2.39996,
         speed = 1.5 + (i % 4);

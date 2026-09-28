@@ -16,46 +16,55 @@ function texture(c: HTMLCanvasElement): THREE.CanvasTexture {
   return t;
 }
 
-/** Additive lens flare: hot core, soft halo and four sharp rays. */
+/** Additive core flash: a hot pinpoint with a tight falloff and four short, thin glints. */
 function flareTexture(): THREE.CanvasTexture {
-  const [c, g] = canvas(256);
-  g.translate(128, 128);
-  const halo = g.createRadialGradient(0, 0, 0, 0, 0, 128);
-  halo.addColorStop(0, 'rgba(255,255,255,1)');
-  halo.addColorStop(0.12, 'rgba(255,240,200,0.95)');
-  halo.addColorStop(0.35, 'rgba(255,150,60,0.35)');
-  halo.addColorStop(1, 'rgba(255,80,20,0)');
-  g.fillStyle = halo;
-  g.fillRect(-128, -128, 256, 256);
+  const [c, g] = canvas(128);
+  g.translate(64, 64);
+  const core = g.createRadialGradient(0, 0, 0, 0, 0, 64);
+  core.addColorStop(0, 'rgba(255,255,255,1)');
+  core.addColorStop(0.08, 'rgba(255,236,190,0.9)');
+  core.addColorStop(0.25, 'rgba(255,150,60,0.18)');
+  core.addColorStop(1, 'rgba(255,90,20,0)');
+  g.fillStyle = core;
+  g.fillRect(-64, -64, 128, 128);
   g.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 4; i++) {
     g.save();
-    g.rotate((i / 8) * Math.PI * 2);
-    const long = i % 2 === 0;
-    const ray = g.createLinearGradient(0, 0, long ? 124 : 70, 0);
-    ray.addColorStop(0, 'rgba(255,255,255,0.95)');
+    g.rotate((i / 4) * Math.PI * 2 + 0.4);
+    const ray = g.createLinearGradient(0, 0, 44, 0);
+    ray.addColorStop(0, 'rgba(255,245,220,0.7)');
     ray.addColorStop(1, 'rgba(255,200,120,0)');
     g.fillStyle = ray;
     g.beginPath();
-    g.moveTo(0, -(long ? 7 : 4));
-    g.lineTo(long ? 124 : 70, 0);
-    g.lineTo(0, long ? 7 : 4);
+    g.moveTo(0, -1.5);
+    g.lineTo(44, 0);
+    g.lineTo(0, 1.5);
     g.fill();
     g.restore();
   }
   return texture(c);
 }
 
-/** Ground shockwave: a bright rim fading inward. */
+/** Ground shockwave: a thin, ragged band of kicked-up dust (normal blending, not a glow). */
 function ringTexture(): THREE.CanvasTexture {
   const [c, g] = canvas(256);
-  const ring = g.createRadialGradient(128, 128, 40, 128, 128, 126);
-  ring.addColorStop(0, 'rgba(255,120,40,0)');
-  ring.addColorStop(0.7, 'rgba(255,150,60,0.25)');
-  ring.addColorStop(0.9, 'rgba(255,245,210,1)');
-  ring.addColorStop(1, 'rgba(255,200,120,0)');
+  const ring = g.createRadialGradient(128, 128, 96, 128, 128, 127);
+  ring.addColorStop(0, 'rgba(120,108,94,0)');
+  ring.addColorStop(0.7, 'rgba(150,136,118,0.55)');
+  ring.addColorStop(0.85, 'rgba(170,154,132,0.35)');
+  ring.addColorStop(1, 'rgba(120,108,94,0)');
   g.fillStyle = ring;
   g.fillRect(0, 0, 256, 256);
+  // Break the band up so it reads as dust, not a drawn circle.
+  g.globalCompositeOperation = 'destination-out';
+  for (let i = 0; i < 90; i++) {
+    const a = Math.random() * Math.PI * 2,
+      r = 100 + Math.random() * 27;
+    g.fillStyle = `rgba(0,0,0,${0.3 + Math.random() * 0.6})`;
+    g.beginPath();
+    g.arc(128 + Math.cos(a) * r, 128 + Math.sin(a) * r, 3 + Math.random() * 7, 0, 7);
+    g.fill();
+  }
   return texture(c);
 }
 
@@ -87,6 +96,8 @@ export class WowEffects {
           new THREE.Sprite(
             new THREE.SpriteMaterial({
               map: flare,
+              // Only the pinpoint core exceeds the bloom threshold (~2x at its centre).
+              color: new THREE.Color(2.2, 2, 1.8),
               toneMapped: false,
               blending: THREE.AdditiveBlending,
               depthWrite: false,
@@ -103,7 +114,7 @@ export class WowEffects {
             plane,
             new THREE.MeshBasicMaterial({
               map: ring,
-              blending: THREE.AdditiveBlending,
+              color: new THREE.Color(0.6, 0.57, 0.53),
               depthWrite: false,
               transparent: true,
             }),
@@ -120,16 +131,16 @@ export class WowEffects {
   private flash(x: number, y: number, z: number, size: number): void {
     const s = this.take(this.flashes);
     s.object.position.set(x, y, z);
-    s.life = s.max = 0.22;
+    s.life = s.max = 0.12;
     s.size = size;
     s.spin = Math.random() * Math.PI;
     s.object.visible = true;
   }
 
-  private ring(x: number, z: number, size: number): void {
+  private ring(x: number, z: number, size: number, life = 0.3): void {
     const s = this.take(this.rings);
     s.object.position.set(x, 0.06, z);
-    s.life = s.max = 0.45;
+    s.life = s.max = life;
     s.size = size;
     s.object.visible = true;
   }
@@ -137,14 +148,14 @@ export class WowEffects {
   melee(x: number, z: number, weapon: FrontWeapon, y = 0.95): void {
     // Grinding weapons hit every frame: a small flare only.
     const grinding = weapon === 'saw' || weapon === 'drill' || weapon === 'wedge';
-    this.flash(x, y, z, grinding ? 1.4 : 3.2);
-    if (!grinding) this.ring(x, z, weapon === 'hammer' ? 6 : 4.5);
+    this.flash(x, y, z, grinding ? 0.5 : 0.9);
+    if (!grinding) this.ring(x, z, weapon === 'hammer' ? 3 : 2.2);
   }
 
   impact(x: number, z: number, type: GameEvent['type'], y = 1): void {
     const big = type !== 'hit';
-    this.flash(x, y, z, big ? 7 : 2.4);
-    if (big) this.ring(x, z, type === 'explosion' ? 11 : 9);
+    this.flash(x, y, z, big ? 1.1 : 0.8);
+    if (big) this.ring(x, z, type === 'explosion' ? 9 : 6, 0.55);
   }
 
   clear(): void {
@@ -163,9 +174,9 @@ export class WowEffects {
         continue;
       }
       const t = 1 - s.life / s.max;
-      s.object.scale.setScalar(s.size * (0.6 + t * 0.8));
+      s.object.scale.setScalar(s.size * (1 - t * 0.4));
       const material = s.object.material as THREE.SpriteMaterial;
-      material.opacity = 1 - t * t;
+      material.opacity = (1 - t) ** 2;
       material.rotation = s.spin + t * 0.6;
     }
     for (const s of this.rings) {
@@ -177,7 +188,7 @@ export class WowEffects {
       }
       const t = 1 - s.life / s.max;
       s.object.scale.setScalar(s.size * (1 - Math.pow(1 - t, 3)));
-      (s.object.material as THREE.MeshBasicMaterial).opacity = 1 - t;
+      (s.object.material as THREE.MeshBasicMaterial).opacity = (1 - t) * 0.8;
     }
   }
 }

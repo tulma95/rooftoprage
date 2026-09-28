@@ -1,17 +1,39 @@
 :root {
   font-family: 'IBM Plex Sans', Arial, sans-serif;
-  color: #e7e6df;
+  color: #ece9e0;
   background: #171d20;
   font-synthesis: none;
   font-size: 14px;
   --accent: #ecc05c;
-  --muted: #a4aaa7;
+  --accent-hot: #ffd97a;
+  --accent-deep: #c98a2c;
+  --danger: #ff5a3c;
+  --ok: #8fd88a;
+  --muted: #a9afab;
+  --ink: #0b1114;
+  --glass: linear-gradient(135deg, #18222ad0, #0b1116b8);
+  --line: #ecc05c40;
+  --cut: 14px;
+  --chamfer: polygon(
+    0 0,
+    calc(100% - var(--cut)) 0,
+    100% var(--cut),
+    100% 100%,
+    var(--cut) 100%,
+    0 calc(100% - var(--cut))
+  );
+  --display: 'Barlow Condensed', Impact, 'Arial Narrow', sans-serif;
 }
 * {
   box-sizing: border-box;
 }
+html {
+  /* Kills iOS double-tap zoom while keeping taps instant. */
+  touch-action: manipulation;
+}
 body {
   margin: 0;
+  background: #171d20;
 }
 button,
 input {
@@ -22,52 +44,102 @@ a,
 input {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* ---------- Buttons: chamfered, condensed, uppercase ---------- */
 button {
+  --cut: 9px;
+  position: relative;
   cursor: pointer;
-  border: 1px solid #616761;
-  background: #272d2d;
-  color: #e7e6df;
-  padding: 13px 19px;
+  border: 0;
+  clip-path: var(--chamfer);
+  background: linear-gradient(180deg, #2c363acc, #1a2226cc);
+  box-shadow: inset 0 0 0 1px #ffffff26;
+  color: #ece9e0;
+  padding: 13px 20px;
   text-align: left;
-  font-weight: 600;
-  transition: background 0.15s;
+  font: 700 16px/1.1 var(--display);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  transition:
+    background 0.15s,
+    box-shadow 0.15s,
+    transform 0.12s,
+    color 0.15s;
 }
 button:hover {
-  background: #424942;
+  background: linear-gradient(180deg, #3c484bdd, #273034dd);
+  box-shadow:
+    inset 0 0 0 1px #ecc05c99,
+    inset 3px 0 0 var(--accent);
+}
+button:active:not(:disabled) {
+  transform: translateY(1px) scale(0.985);
 }
 button:disabled {
   cursor: not-allowed;
   opacity: 0.4;
 }
-button:focus-visible,
+/* clip-path hides outer outlines, so focus rings sit inside the chamfer. */
+button:focus-visible {
+  outline: 2px solid var(--accent-hot);
+  outline-offset: -5px;
+}
 a:focus-visible,
 input:focus-visible {
-  outline: 3px solid #f6ce72;
-  outline-offset: 4px;
+  outline: 3px solid var(--accent-hot);
+  outline-offset: 3px;
 }
 a {
   color: inherit;
   text-decoration: none;
 }
 button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #202723;
+  background: linear-gradient(180deg, var(--accent-hot), var(--accent) 55%, var(--accent-deep));
+  box-shadow: inset 0 -3px 0 #0003;
+  color: #1a1a12;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 45px;
+  overflow: hidden;
+}
+button.primary::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 -60%;
+  width: 40%;
+  background: linear-gradient(100deg, #fff0, #fff8, #fff0);
+  transform: skewX(-20deg);
+  animation: shine 4.5s ease-in-out 1.2s infinite;
+  pointer-events: none;
 }
 button.primary:hover {
-  background: #ffda84;
+  background: linear-gradient(180deg, #ffe7a8, var(--accent-hot) 55%, var(--accent));
+  box-shadow: inset 0 -3px 0 #0003;
+}
+button.primary:focus-visible {
+  outline-color: #1a1a12;
+}
+@keyframes shine {
+  0%,
+  70% {
+    left: -60%;
+  }
+  100% {
+    left: 130%;
+  }
 }
 .quiet {
   background: transparent;
-  border-color: transparent;
+  box-shadow: none;
+  color: #cfd3cb;
 }
 .quiet:hover {
-  background: #ffffff10;
+  background: #ffffff12;
+  box-shadow: inset 3px 0 0 var(--accent);
 }
+
+/* ---------- Page frame ---------- */
 #world {
   position: fixed;
   inset: 0;
@@ -78,8 +150,20 @@ button.primary:hover {
 #app {
   position: relative;
   padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);
-  min-height: 100vh;
+  z-index: 1;
+  min-height: 100dvh;
   pointer-events: none;
+}
+/* Menus: a left-side scrim keeps text legible while the 3D machine stays in full view. */
+body:not(.in-game) #app::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(90deg, #070b0ee6 0%, #070b0ea8 30%, #070b0e30 52%, #070b0e00 65%),
+    linear-gradient(0deg, #070b0ecc 0%, #070b0e00 22%),
+    linear-gradient(180deg, #070b0e99 0%, #070b0e00 16%);
 }
 #app button,
 #app a,
@@ -87,38 +171,49 @@ button.primary:hover {
 #app form,
 #app .panel,
 #app .modal,
-#app .results {
+#app .results-card {
   pointer-events: auto;
 }
 header {
-  height: 100px;
+  position: relative;
+  height: 96px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 5vw;
-  border-bottom: 1px solid #ccd0bc20;
-  background: linear-gradient(#12191cbb, #12191c00);
+}
+header::after {
+  content: '';
+  position: absolute;
+  left: 5vw;
+  right: 5vw;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--accent) 0 60px, #ffffff26 60px, #ffffff00);
 }
 .brand {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-family: 'Barlow Condensed', Impact, sans-serif;
-  font-size: 25px;
-  font-weight: 800;
-  letter-spacing: 1px;
+  font: 800 26px var(--display);
+  letter-spacing: 2px;
 }
 .brand-icon {
+  --cut: 8px;
+  clip-path: var(--chamfer);
   background: var(--accent);
-  color: #202724;
-  padding: 8px;
-  font-size: 25px;
+  color: #1a1a12;
+  padding: 7px 10px;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: 0;
 }
 .brand-sub {
   font:
-    10px 'IBM Plex Sans',
+    600 10px 'IBM Plex Sans',
     sans-serif;
-  letter-spacing: 3px;
+  letter-spacing: 4px;
+  color: #c9c6b8;
   border-left: 1px solid #65706a;
   padding-left: 12px;
 }
@@ -127,13 +222,19 @@ nav {
   align-items: center;
   gap: 22px;
 }
+nav button {
+  font-size: 14px;
+}
 .pilot-name {
-  color: #b9c0b9;
-  font-size: 12px;
+  color: #c8cdc4;
+  font: 700 15px var(--display);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
 }
 .connection {
   font-size: 10px;
-  letter-spacing: 1px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
   color: #f0aa79;
   display: block;
 }
@@ -141,46 +242,109 @@ nav {
   color: #b4cbaa;
 }
 .shell {
-  padding: 7vh 5vw 100px;
-  min-height: calc(100vh - 155px);
+  padding: 6vh 5vw 100px;
+  min-height: calc(100dvh - 151px);
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 .panel {
-  max-width: 550px;
-  width: 47%;
-  background: linear-gradient(90deg, #172022cc, #17202255);
-  padding: 32px;
+  position: relative;
+  max-width: 540px;
+  width: 44%;
+  padding: 8px 0 8px 28px;
+}
+/* Accent rail instead of an opaque box. */
+.panel::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  background: linear-gradient(var(--accent), #ecc05c33 40%, #ecc05c00);
+}
+/* Entry motion replays only when the screen actually changes. */
+.shell:not(.same) .panel > * {
+  animation: enter 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.shell:not(.same) .panel > :nth-child(2) {
+  animation-delay: 0.05s;
+}
+.shell:not(.same) .panel > :nth-child(3) {
+  animation-delay: 0.1s;
+}
+.shell:not(.same) .panel > :nth-child(4) {
+  animation-delay: 0.15s;
+}
+.shell:not(.same) .panel > :nth-child(n + 5) {
+  animation-delay: 0.2s;
+}
+.shell:not(.same) .machine-caption {
+  animation: enter-right 0.7s 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+@keyframes enter-right {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
 }
 .eyebrow {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 10px;
-  letter-spacing: 2.4px;
-  font-weight: 600;
+  letter-spacing: 3px;
+  font-weight: 700;
   color: var(--accent);
   text-transform: uppercase;
-  margin-bottom: 17px;
+  margin-bottom: 16px;
+}
+.panel > .eyebrow::before {
+  content: '';
+  width: 18px;
+  height: 2px;
+  background: var(--accent);
 }
 h1,
 h2 {
-  font-family: 'Barlow Condensed', Impact, 'Arial Narrow', sans-serif;
-  margin: 0 0 25px;
-  line-height: 0.96;
-  letter-spacing: -0.6px;
+  font-family: var(--display);
+  margin: 0 0 24px;
+  line-height: 0.92;
+  letter-spacing: -0.5px;
+  text-transform: uppercase;
 }
 h1 {
-  font-size: clamp(42px, 5.5vw, 82px);
-  font-weight: 800;
+  font-size: clamp(46px, 5.4vw, 86px);
+  font-weight: 900;
+  background: linear-gradient(180deg, #fff 30%, #d9d2bd);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 4px 18px #0009);
 }
 h2 {
   font-size: 40px;
+  font-weight: 800;
+}
+.panel .eyebrow,
+.panel .muted,
+nav,
+footer {
+  text-shadow: 0 1px 6px #000c;
 }
 .lede {
   font-size: 16px;
-  line-height: 1.65;
-  color: #c1c7c1;
+  line-height: 1.6;
+  color: #d0d4cc;
   margin-bottom: 28px;
+  text-shadow: 0 1px 8px #000a;
 }
 p {
   line-height: 1.65;
@@ -192,57 +356,61 @@ p {
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
   margin-top: 24px;
 }
 .actions > button {
-  min-height: 48px;
-  padding: 14px 20px;
+  min-height: 50px;
+  padding: 14px 22px;
 }
 .panel > :last-child {
   margin-bottom: 0;
 }
 .actions .primary {
-  min-width: 210px;
+  min-width: 220px;
+  font-size: 19px;
+}
+.panel > button {
+  margin: 0 8px 8px 0;
 }
 .spec-strip {
   display: flex;
-  gap: 30px;
-  margin-top: 48px;
-  padding-top: 25px;
-  border-top: 1px solid #6b766b55;
-  font-size: 11px;
-  letter-spacing: 1px;
+  gap: 34px;
+  margin-top: 44px;
+  padding-top: 22px;
+  border-top: 1px solid #ffffff1f;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
   color: #9ba69d;
 }
 .spec-strip b {
   display: block;
-  color: #d5d9cc;
-  font:
-    28px 'Barlow Condensed',
-    Impact,
-    sans-serif;
+  color: var(--accent);
+  font: 800 34px var(--display);
   letter-spacing: 1px;
-  margin-bottom: 5px;
+  margin-bottom: 2px;
 }
 .machine-caption {
   align-self: flex-end;
   text-align: right;
-  margin-bottom: 15px;
-  text-shadow: 0 2px 10px #000;
+  margin-bottom: 10px;
+  text-shadow: 0 2px 12px #000;
+}
+.machine-caption .eyebrow {
+  justify-content: flex-end;
 }
 .machine-caption p {
-  font:
-    26px/1 'Barlow Condensed',
-    Impact,
-    sans-serif;
+  font: 900 34px/0.95 var(--display);
   letter-spacing: 2px;
+  margin: 0 0 14px;
 }
 .machine-caption > span:last-child {
   font-size: 11px;
+  font-weight: 600;
   line-height: 2;
-  color: #adb6ad;
-  letter-spacing: 1px;
+  color: #c3cabf;
+  letter-spacing: 1.5px;
 }
 footer {
   position: absolute;
@@ -250,111 +418,175 @@ footer {
   left: 5vw;
   right: 5vw;
   height: 55px;
-  border-top: 1px solid #82918233;
+  border-top: 1px solid #ffffff1a;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: #83918a;
-  font-size: 11px;
-  letter-spacing: 1.8px;
+  color: #8e9a93;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2.4px;
 }
 form {
   display: grid;
   gap: 12px;
-  max-width: 400px;
+  max-width: 420px;
 }
 form label {
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
   color: #b4bdb5;
 }
 input:not([type='checkbox']) {
   width: 100%;
-  padding: 16px;
-  background: #131c1ed9;
-  border: 1px solid #626d65;
+  padding: 16px 18px;
+  background: #0b1216cc;
+  border: 0;
+  box-shadow:
+    inset 0 0 0 1px #ffffff2e,
+    inset 0 -2px 0 var(--accent);
   color: #fff;
   border-radius: 0;
+  font: 700 22px var(--display);
+  letter-spacing: 1.5px;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 input::placeholder {
   color: #78857b;
 }
 .divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   font-size: 10px;
-  letter-spacing: 2px;
-  margin: 28px 0;
-  color: #85958a;
+  font-weight: 700;
+  letter-spacing: 3px;
+  margin: 26px 0;
+  color: #95a39a;
 }
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #ffffff1f;
+}
+
+/* ---------- Garage choices ---------- */
 .choices {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
 }
 .slots {
-  margin-top: 28px;
+  margin-top: 24px;
 }
-.slots > .eyebrow {
-  margin-top: 18px;
+.slots > div + div {
+  margin-top: 14px;
 }
 .choice {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  padding: 15px;
+  gap: 6px;
+  padding: 14px;
+  text-transform: none;
+  letter-spacing: 0;
+  background: linear-gradient(160deg, #1d272cd9, #0e1519c9);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 .choice.selected {
-  border-color: var(--accent);
-  background: #414135;
+  background: linear-gradient(160deg, #4a4125e6, #241f14d9);
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    inset 0 -3px 0 var(--accent);
 }
 .choice strong {
-  font-size: 13px;
+  font: 800 16px var(--display);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
 }
 .choice small {
-  font-size: 10px;
-  color: #abb7a9;
+  font: 500 10px 'IBM Plex Sans', sans-serif;
+  letter-spacing: 0.3px;
+  color: #b3bdb0;
 }
 .weapon-symbol {
-  font-size: 25px;
+  font-size: 30px;
   color: var(--accent);
 }
+.chassis-picker > .muted,
+.slots .muted {
+  margin: 10px 0 0;
+}
+
+/* ---------- Lobby ---------- */
 .room-code {
   display: flex;
   align-items: center;
-  gap: 25px;
-  padding: 12px 0;
+  gap: 18px;
+  padding: 6px 0 4px;
 }
 .room-code > span {
-  font:
-    40px 'Barlow Condensed',
-    Impact,
-    sans-serif;
-  letter-spacing: 7px;
+  --cut: 10px;
+  clip-path: var(--chamfer);
+  font: 800 42px/1 var(--display);
+  letter-spacing: 8px;
   color: var(--accent);
+  background: #0b1216b3;
+  box-shadow: inset 0 0 0 1px var(--line);
+  padding: 10px 18px 8px 22px;
 }
 .roster {
-  margin: 20px 0;
+  margin: 18px 0;
+  display: grid;
+  gap: 6px;
 }
 .pilot {
+  --cut: 10px;
+  clip-path: var(--chamfer);
   display: flex;
-  gap: 12px;
+  gap: 14px;
   align-items: center;
-  border-top: 1px solid #7b87793b;
-  padding: 16px 0;
+  background: linear-gradient(90deg, #1b252ae0, #0e1519a8);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  padding: 12px 16px 12px 0;
+  animation: enter 0.4s both;
+}
+.pilot .swatch {
+  width: 5px;
+  height: 42px;
 }
 .pilot > span:nth-child(2) {
   flex: 1;
 }
 .pilot strong {
-  font-size: 13px;
+  font: 800 17px var(--display);
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 .pilot small {
   display: block;
   font-size: 10px;
-  margin-top: 7px;
-  color: #9cab9e;
+  margin-top: 4px;
+  color: #a7b3a8;
 }
 .pilot > b {
+  --cut: 6px;
+  clip-path: var(--chamfer);
   font-size: 10px;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
+  padding: 6px 10px;
+  background: #ffffff0d;
+  box-shadow: inset 0 0 0 1px #ffffff40;
+  color: #cfd3cb;
+}
+.pilot > b.ready {
+  background: var(--accent);
+  color: #1a1a12;
 }
 .swatch {
   width: 9px;
@@ -367,7 +599,7 @@ input::placeholder {
 }
 .notice {
   border-left: 3px solid var(--accent);
-  background: #3d3b2c;
+  background: #3d3b2ccc;
   padding: 12px 15px;
   font-size: 13px;
 }
@@ -376,9 +608,10 @@ input::placeholder {
   justify-content: space-between;
   align-items: center;
   gap: 15px;
-  padding: 18px 0;
-  border-bottom: 1px solid #7b87793b;
+  padding: 16px 0;
+  border-bottom: 1px solid #ffffff1a;
   font-size: 13px;
+  font-weight: 500;
 }
 .setting input {
   accent-color: var(--accent);
@@ -387,11 +620,13 @@ input::placeholder {
 }
 kbd {
   display: inline-block;
-  border: 1px solid #9ba79266;
-  padding: 3px 7px;
-  font: 11px monospace;
-  background: #141c1c;
-  color: #eed8a0;
+  border: 1px solid #ffffff38;
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font: 600 11px 'IBM Plex Sans', monospace;
+  background: #0d1417;
+  color: #f1dca6;
 }
 .controls p {
   display: flex;
@@ -399,47 +634,118 @@ kbd {
   gap: 10px;
 }
 .glass {
-  background: #111b20e8;
-  border: 1px solid #7b89745e;
-  box-shadow: 0 8px 32px #0003;
+  --cut: 12px;
+  clip-path: var(--chamfer);
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
+  box-shadow: inset 0 0 0 1px #ffffff1c;
+}
+
+/* ================= BATTLE HUD ================= */
+#hud {
+  font-variant-numeric: tabular-nums;
 }
 .hud-roster {
   position: fixed;
   top: 24px;
   left: 24px;
-  min-width: 205px;
-  padding: 15px;
+  width: 220px;
+  padding: 10px 14px 12px;
+  display: grid;
+  gap: 2px;
 }
 .hud-roster > div {
-  display: flex;
+  display: grid;
+  grid-template-columns: 4px 1fr auto;
+  grid-template-rows: auto 3px;
+  column-gap: 9px;
+  row-gap: 4px;
   align-items: center;
-  gap: 10px;
-  padding: 6px 0;
-  font-size: 12px;
+  padding: 5px 0;
+  transition: opacity 0.4s;
+}
+.hud-roster .swatch {
+  grid-row: span 2;
+  width: 4px;
+  height: 100%;
+  background: var(--c);
+}
+.hud-roster .who {
+  font: 700 15px var(--display);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hud-roster .me .who {
+  color: var(--accent);
 }
 .hud-roster small {
-  margin-left: auto;
   color: #b9c4b0;
-  font-size: 11px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
 }
+.hud-roster .hp {
+  grid-column: 2 / 4;
+  height: 3px;
+  background: #ffffff1a;
+}
+.hud-roster .hp b {
+  display: block;
+  height: 100%;
+  background: var(--c);
+  transition: width 0.25s;
+}
+.hud-roster .out {
+  opacity: 0.4;
+}
+.hud-roster .out .who {
+  text-decoration: line-through;
+}
+.hud-roster .out small {
+  color: var(--danger);
+}
+
 .hud-timer {
+  --cut: 16px;
   position: fixed;
-  top: 24px;
+  top: 20px;
   left: 50%;
   transform: translateX(-50%);
   text-align: center;
-  padding: 12px 35px;
+  padding: 8px 40px 10px;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 18px) 100%, 18px 100%);
+  box-shadow: inset 0 3px 0 var(--accent);
 }
 .hud-timer strong {
   display: block;
-  font:
-    36px 'Barlow Condensed',
-    Impact,
-    sans-serif;
+  font: 800 42px/1 var(--display);
+  letter-spacing: 1px;
 }
 .hud-timer span {
-  font-size: 10px;
-  color: #abbba7;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #b9c4b0;
+}
+.hud-timer.urgent {
+  box-shadow: inset 0 3px 0 var(--danger);
+}
+.hud-timer.urgent strong {
+  color: var(--danger);
+  animation: beat 1s ease-in-out infinite;
+}
+@keyframes beat {
+  15% {
+    transform: scale(1.12);
+  }
+  30% {
+    transform: scale(1);
+  }
 }
 .hud-menu {
   position: fixed;
@@ -447,50 +753,209 @@ kbd {
   top: 24px;
   text-align: right;
 }
-.hud-menu .connection {
-  margin-top: 10px;
+.hud-menu button {
+  font-size: 15px;
 }
+.hud-menu .connection {
+  margin-top: 8px;
+}
+
+/* Kill feed: slides in, lingers, slides away. */
+.kill-feed {
+  position: fixed;
+  top: 100px;
+  right: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+.kill-feed li {
+  --cut: 8px;
+  clip-path: var(--chamfer);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  background: linear-gradient(90deg, #0b1116c0, #141d22e6);
+  box-shadow: inset -3px 0 0 #ffffff55;
+  font: 700 15px var(--display);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  animation:
+    feed-in 0.35s cubic-bezier(0.2, 0.9, 0.2, 1.2) both,
+    feed-out 0.4s 5.5s ease-in forwards;
+}
+.kill-feed li.mine {
+  background: linear-gradient(90deg, #3a2f12d0, #5a4617e6);
+  box-shadow: inset -3px 0 0 var(--accent);
+}
+.kill-feed b {
+  color: var(--c);
+  filter: brightness(1.25);
+}
+.kill-feed b.me {
+  color: var(--accent);
+}
+.kill-feed .how {
+  color: var(--danger);
+  font-size: 14px;
+}
+.kill-feed small {
+  font: 600 9px 'IBM Plex Sans', sans-serif;
+  letter-spacing: 1px;
+  color: #b9c4b0;
+}
+.kill-feed small:empty {
+  display: none;
+}
+@keyframes feed-in {
+  from {
+    opacity: 0;
+    transform: translateX(60px);
+  }
+}
+@keyframes feed-out {
+  to {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+}
+
+/* Bottom bar: health plate and ability cards share one height, baseline, glass and state line. */
+.hud-health,
+.weapon-hud {
+  --cut: 12px;
+  --tone: #ffffff2e;
+  height: 72px;
+  clip-path: var(--chamfer);
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
+  box-shadow:
+    inset 0 0 0 1px #ffffff1c,
+    inset 0 -2px 0 var(--tone);
+  transition: box-shadow 0.2s;
+}
+.icon {
+  width: 1em;
+  height: 1em;
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Health: number on the left, pilot + segmented bar with a lagging damage trail on the right. */
 .hud-health {
+  --tone: var(--ok);
   position: fixed;
   bottom: 24px;
   left: 24px;
-  padding: 18px;
-  min-width: 230px;
+  width: 316px;
+  padding: 0 18px 0 16px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  align-content: center;
+  column-gap: 14px;
 }
 .hud-health .eyebrow {
-  margin-bottom: 10px;
-  max-width: 240px;
-  overflow-wrap: anywhere;
+  grid-column: 2;
+  margin: 0 0 7px;
+  font-size: 9px;
+  letter-spacing: 2.4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .hud-health strong {
-  font:
-    32px 'Barlow Condensed',
-    Impact,
-    sans-serif;
+  grid-row: 1 / 3;
+  grid-column: 1;
+  min-width: 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font: 900 44px/0.86 var(--display);
+  letter-spacing: -0.5px;
 }
 .hud-health strong small {
-  font:
-    12px 'IBM Plex Sans',
-    sans-serif;
-  color: #95a58f;
+  margin-top: 3px;
+  font: 700 10px/1 var(--display);
+  letter-spacing: 1.6px;
+  color: #a9b5a4;
 }
 .meter {
+  position: relative;
   height: 4px;
-  background: #526151;
+  background: #ffffff1f;
   margin-top: 12px;
 }
-.meter i {
+.meter i,
+.meter b {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
   display: block;
-  height: 100%;
   background: var(--accent);
   transition: width 0.08s;
 }
+.hud-health .meter {
+  grid-column: 2;
+  height: 14px;
+  margin: 0 4px 0 0;
+  transform: skewX(-18deg);
+  background: #000000a0;
+  box-shadow: inset 0 0 0 1.5px #ffffff40;
+}
+.hud-health .meter b {
+  background: #fff;
+  transition: width 0.5s 0.35s ease-out;
+}
+.hud-health .meter i {
+  background: linear-gradient(180deg, #d4f2c4, var(--ok) 50%, #5ea85a);
+  box-shadow: 0 0 12px #8fd88a66;
+}
+/* Segment notches every 20 HP; empty cells stay visible. */
+.hud-health .meter::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #ffffff10 0 calc(100% - 3px), #0b1114 0);
+  background-size: calc(100% / var(--segments, 5)) 100%;
+}
+.mid-health {
+  --tone: var(--accent);
+}
+.mid-health .meter i {
+  background: linear-gradient(180deg, #ffe0a0, var(--accent) 50%, var(--accent-deep));
+  box-shadow: 0 0 12px #ecc05c66;
+}
 .low-health {
-  border-color: #e66e4f;
+  --tone: var(--danger);
+}
+.low-health .meter b {
+  background: #7a1a0c;
 }
 .low-health .meter i {
-  background: #f07554;
+  min-width: 4px;
+  background: linear-gradient(180deg, #ffb09a, #ff3b1f 45%, #d0200a);
+  box-shadow: 0 0 10px #ff3b1f;
+  animation: low-pulse 0.7s ease-in-out infinite alternate;
 }
+.low-health strong > span {
+  color: var(--danger);
+  text-shadow: 0 0 14px #ff5a3c77;
+  animation: beat 0.9s ease-in-out infinite;
+}
+@keyframes low-pulse {
+  to {
+    opacity: 0.55;
+  }
+}
+
+/* Ability cards: gold disc when charged, dark disc with a radial sweep + seconds while cooling. */
 .hud-weapons {
   position: fixed;
   bottom: 24px;
@@ -500,147 +965,662 @@ kbd {
   gap: 8px;
 }
 .weapon-hud {
-  background: #111b20e8;
-  border: 1px solid #7b89745e;
-  min-width: 175px;
-  padding: 14px;
+  --ready: 1;
+  display: flex;
+  align-items: center;
+  position: relative;
+  gap: 12px;
+  width: 232px;
+  padding: 0 16px 0 12px;
+}
+.weapon-hud.ready {
+  --tone: var(--accent);
+}
+.weapon-hud > div {
+  flex: 1;
+  min-width: 0;
+}
+.weapon-hud .ring {
+  position: relative;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  color: #ffffff59;
+  /* Charge fill: a translucent gold wedge grows clockwise from 12 o'clock. */
+  background:
+    conic-gradient(#ecc05c38 calc(var(--ready) * 1turn), #0000 0),
+    radial-gradient(circle, #1a2126, #0b1013);
+  box-shadow: inset 0 0 0 1px #ffffff1a;
+}
+/* Progress ring on the rim. */
+.weapon-hud .ring::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(var(--accent) calc(var(--ready) * 1turn), #ffffff1a 0);
+  -webkit-mask: radial-gradient(closest-side, #0000 86%, #000 88%);
+  mask: radial-gradient(closest-side, #0000 86%, #000 88%);
+}
+.weapon-hud .ring::after {
+  content: attr(data-sec);
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 800 19px/1 var(--display);
+  color: #fff;
+  text-shadow:
+    0 0 4px #000,
+    0 1px 2px #000;
+}
+.weapon-hud .ring > .icon {
+  position: relative;
+  z-index: 0;
+}
+.weapon-hud .ring[data-sec]:not([data-sec='']) > .icon {
+  opacity: 0.4;
+}
+.weapon-hud.ready .ring {
+  color: #1a1408;
+  background: radial-gradient(circle at 50% 35%, var(--accent-hot), var(--accent) 55%, var(--accent-deep));
+  box-shadow:
+    inset 0 -3px 0 #0003,
+    inset 0 2px 0 #fff6,
+    0 0 16px #ecc05c88;
+  animation: ready-flash 0.35s ease-out;
+}
+.weapon-hud.ready .ring::before {
+  background: none;
+}
+.weapon-hud.active {
+  --tone: var(--accent-hot);
+  background: linear-gradient(135deg, #5a4617e6, #241f14d0);
+}
+.weapon-hud.active .ring {
+  animation: firing 0.25s linear infinite;
+}
+.weapon-hud.hot {
+  --tone: var(--danger);
+}
+.weapon-hud.hot .ring {
+  color: var(--danger);
+}
+.weapon-hud.hot .ring::before {
+  background: conic-gradient(var(--danger) calc(var(--ready) * 1turn), #ff5a3c33 0);
+}
+.weapon-hud.hot small {
+  color: var(--danger);
+}
+@keyframes ready-flash {
+  40% {
+    transform: scale(1.14);
+    box-shadow: 0 0 28px var(--accent);
+  }
+}
+@keyframes firing {
+  50% {
+    transform: scale(0.92);
+  }
 }
 .weapon-hud .eyebrow {
-  font-size: 11px;
-  margin-bottom: 7px;
+  font-size: 9px;
+  letter-spacing: 2.4px;
+  margin-bottom: 1px;
+  color: #a9b5a4;
 }
 .weapon-hud strong {
-  font-size: 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
+  display: block;
+  font: 800 19px/1.05 var(--display);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #b9c0b6;
+}
+.weapon-hud.ready strong {
+  color: #f4efe2;
 }
 .weapon-hud small {
   display: block;
-  font-size: 11px;
-  color: #b8c6ab;
-  margin-top: 10px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  color: #8e998c;
+  margin-top: 3px;
+}
+.weapon-hud.ready small {
+  color: var(--accent);
 }
 .weapon-hud kbd {
-  font-size: 11px;
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  font-size: 10px;
 }
+
+/* Crosshair + hit marker drawn with gradients; no glyph font dependency. */
+#aim {
+  position: fixed;
+  width: 30px;
+  height: 30px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background:
+    radial-gradient(circle, #fff 1.6px, #0000 2.2px),
+    linear-gradient(#fffd, #fffd) 50% 0 / 2px 8px no-repeat,
+    linear-gradient(#fffd, #fffd) 50% 100% / 2px 8px no-repeat,
+    linear-gradient(#fffd, #fffd) 0 50% / 8px 2px no-repeat,
+    linear-gradient(#fffd, #fffd) 100% 50% / 8px 2px no-repeat;
+  filter: drop-shadow(0 0 2px #000);
+}
+#aim::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  opacity: 0;
+  background:
+    linear-gradient(45deg, #0000 46%, #ff5a3c 46% 54%, #0000 54%),
+    linear-gradient(-45deg, #0000 46%, #ff5a3c 46% 54%, #0000 54%);
+  -webkit-mask: radial-gradient(circle, #0000 42%, #000 43%);
+  mask: radial-gradient(circle, #0000 42%, #000 43%);
+}
+#aim.hit::after {
+  animation: hitmark 0.3s ease-out;
+}
+@keyframes hitmark {
+  0% {
+    opacity: 1;
+    transform: scale(1.5);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+/* Damage numbers and incoming-hit direction arcs. */
+.popups > * {
+  position: fixed;
+  pointer-events: none;
+}
+.dmg {
+  transform: translate(-50%, -50%);
+  font: 900 30px/1 var(--display);
+  color: #fff;
+  -webkit-text-stroke: 1px #0008;
+  text-shadow: 0 2px 6px #000c;
+  animation: pop-up 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+.dmg.big {
+  font-size: 40px;
+  color: var(--accent-hot);
+}
+.dmg.kill {
+  font-size: 46px;
+  color: var(--danger);
+}
+.dmg.kill::after {
+  content: ' KO';
+  font-size: 0.6em;
+}
+@keyframes pop-up {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.8);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -140%) scale(0.9);
+  }
+}
+.hit-dir {
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(circle 16vmin at var(--x) var(--y), #ff3b1fd0, #ff3b1f40 55%, #ff3b1f00 70%);
+  animation: edge-pulse 0.55s ease-out forwards;
+}
+@keyframes edge-pulse {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Screen-edge feedback: crisp red rim only. No blur, no tint over the scene. */
+.vignette {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.vignette::before,
+.vignette i {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  box-shadow:
+    inset 0 0 0 3px #ff3b1f,
+    inset 0 0 14px 2px #ff2a1080;
+}
+.vignette.hurt::before {
+  box-shadow:
+    inset 0 0 0 5px #ff3b1f,
+    inset 0 0 22px 4px #ff2a10a0;
+  animation: hurt 0.45s ease-out;
+}
+@keyframes hurt {
+  from {
+    opacity: var(--hurt, 0.6);
+  }
+}
+.vignette.critical i {
+  animation: heartbeat 1.1s ease-in-out infinite;
+}
+@keyframes heartbeat {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  12% {
+    opacity: 1;
+  }
+  24% {
+    opacity: 0.45;
+  }
+  36% {
+    opacity: 0.85;
+  }
+}
+
+/* Personal elimination banner. */
 .combat-message {
   position: fixed;
-  top: 145px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #152023c9;
-  padding: 5px 15px;
-  font-size: 12px;
+  top: 26%;
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 14px 20px;
   text-align: center;
+  font: 900 44px/1 var(--display);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(90deg, #0000, #8a1a0ccc 25%, #8a1a0ccc 75%, #0000);
+  text-shadow: 0 2px 10px #000;
+  animation: banner 0.45s cubic-bezier(0.2, 0.9, 0.2, 1.1) both;
 }
 .combat-message:empty {
   display: none;
 }
-#aim {
-  position: fixed;
-  transform: translate(-50%, -50%);
-  font-size: 21px;
-  color: #ead7a3a0;
-  text-shadow: 0 1px #000;
+@keyframes banner {
+  from {
+    opacity: 0;
+    transform: scaleY(0.2);
+    letter-spacing: 16px;
+  }
 }
-.center-card,
-.results {
+
+/* Countdown: each number slams in, FIGHT bursts out. */
+.countdown b {
+  position: fixed;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  font: 900 min(34vh, 260px) / 1 var(--display);
+  color: var(--accent);
+  -webkit-text-stroke: 2px #fff3;
+  text-shadow:
+    0 0 40px #ecc05c88,
+    0 8px 0 #0006;
+  animation: slam 0.95s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  pointer-events: none;
+}
+.countdown b.go {
+  color: #fff;
+  font-size: min(26vh, 200px);
+  letter-spacing: 4px;
+  font-style: italic;
+  text-shadow:
+    0 0 50px var(--accent),
+    0 8px 0 #0006;
+  animation: go 1.1s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+@keyframes slam {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.4);
+  }
+  22% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0.85;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+}
+@keyframes go {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4) skewX(-12deg);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.05) skewX(-12deg);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.6) skewX(-12deg);
+  }
+}
+.countdown-label {
+  position: fixed;
+  top: 64%;
+  text-align: center;
+  width: 100%;
+  letter-spacing: 6px;
+  font: 800 18px var(--display);
+  color: #fff;
+  text-shadow: 0 2px 10px #000;
+}
+.center-card {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  padding: 35px;
-  text-align: center;
-  min-width: 420px;
-  max-height: 85vh;
-  overflow: auto;
+  padding: 30px 36px;
+  min-width: 400px;
 }
+.center-card p {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+  font: 700 16px var(--display);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.center-card p b {
+  margin-left: auto;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  animation: low-pulse 0.6s ease-in-out infinite alternate;
+}
+.center-card p.loaded b {
+  color: var(--accent);
+  animation: none;
+}
+
+/* Results: full-screen cinematic scrim, slammed title, ranked rows stagger in. */
 .results {
-  min-width: 520px;
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center start;
+  padding: 20px 20px 20px 6vw;
+  overflow: auto;
+  /* Scrim only behind the table; the finale and winner stay visible on the right. */
+  background: linear-gradient(90deg, #05080ae6 0%, #05080acc 38%, #05080a55 55%, #05080a00 68%);
+  animation: fade-in 0.6s ease-out both;
 }
-.results h1 {
-  font-size: 72px;
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
 }
-.results table {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 25px 0;
+.results-card {
+  width: min(640px, 100%);
   text-align: left;
 }
-.results td,
-.results th {
-  padding: 10px 12px;
-  border-bottom: 1px solid #7b89744d;
-  font-size: 12px;
+.results .eyebrow {
+  animation: enter-up 0.5s 0.1s both;
+}
+.results h1 {
+  position: relative;
+  font-size: clamp(64px, 9vw, 132px);
+  margin-bottom: 10px;
+  animation: title-slam 0.7s 0.15s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+.victory h1 {
+  background: linear-gradient(180deg, #fff6d8 10%, var(--accent-hot) 45%, var(--accent-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 0 30px #ecc05c88) drop-shadow(0 6px 0 #0008);
+}
+.defeat h1 {
+  background: linear-gradient(180deg, #fff 20%, #c9c3b4);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 0 30px #ff5a3c55) drop-shadow(0 6px 0 #0008);
+}
+@keyframes title-slam {
+  from {
+    opacity: 0;
+    transform: scale(1.8);
+    letter-spacing: 30px;
+  }
+}
+@keyframes grow {
+  from {
+    width: 0;
+  }
+}
+@keyframes enter-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+.verdict {
+  font-size: 16px;
+  color: #d0d4cc;
+  animation: enter-up 0.5s 0.5s both;
+}
+.verdict b {
+  color: var(--accent);
+  font: 800 20px var(--display);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.results table {
+  border-collapse: separate;
+  border-spacing: 0 4px;
+  width: 100%;
+  margin: 22px 0 10px;
+  text-align: left;
 }
 .results th {
-  color: var(--accent);
+  padding: 0 14px 4px;
+  color: #c9cfc6;
   font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.results td {
+  padding: 11px 14px;
+  background: #10171bf5;
+  font: 700 18px var(--display);
+  letter-spacing: 0.5px;
+}
+.results td:first-child {
+  width: 56px;
+  text-align: center;
+  color: #0b1114;
+  background: #ffffff38;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+}
+.results td:nth-child(2) {
+  text-transform: uppercase;
+  font-size: 20px;
+}
+.results td:nth-child(2) .swatch {
+  width: 4px;
+  height: 18px;
+  margin-right: 10px;
+  vertical-align: -3px;
+  background: var(--c);
+}
+.results tbody tr {
+  animation: row-in 0.45s calc(0.75s + var(--i) * 0.1s) cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+}
+.results tr.winner td {
+  background: #3f3316f5;
+  font-size: 22px;
+}
+.results tr.winner td:first-child {
+  background: var(--accent);
+  font-size: 26px;
+}
+.results tr.winner td:nth-child(2)::after {
+  content: '  ★ WINNER';
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--accent);
+}
+.results tr.me td:nth-child(2) {
+  color: var(--accent-hot);
+}
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
 }
 .results .actions {
-  justify-content: center;
+  justify-content: flex-start;
+  animation: enter-up 0.5s 1.2s both;
 }
-.countdown-label {
-  position: fixed;
-  top: 35%;
-  text-align: center;
-  width: 100%;
-  letter-spacing: 4px;
-  font-size: 13px;
+/* The HUD chrome steps back while the results own the screen. */
+#hud[data-phase='results']
+  :is(
+    .hud-health,
+    .hud-weapons,
+    .spectator,
+    .kill-feed,
+    .hud-roster,
+    .hud-timer,
+    .hud-menu,
+    .popups,
+    .vignette,
+    .combat-message,
+    #aim
+  ) {
+  display: none !important;
 }
+
 .spectator {
   position: fixed;
-  bottom: 160px;
+  bottom: 150px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 12px;
+  padding: 10px 12px 10px 18px;
   display: flex;
   align-items: center;
   gap: 10px;
 }
 .spectator b {
   font-size: 10px;
+  letter-spacing: 2px;
   color: var(--accent);
 }
 .spectator button {
-  padding: 8px;
-  font-size: 11px;
+  padding: 9px 12px;
+  font-size: 13px;
 }
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: #07101499;
+  background: #05090cb3;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   display: grid;
   place-items: center;
   pointer-events: auto;
+  animation: fade-in 0.2s both;
 }
 .modal {
-  width: 480px;
+  --cut: 18px;
+  width: 500px;
   max-width: 90vw;
   max-height: 90vh;
   overflow: auto;
   padding: 30px;
+  box-shadow:
+    inset 0 0 0 1px #ffffff1c,
+    inset 0 3px 0 var(--accent);
+  animation: enter-up 0.25s both;
 }
 .modal > button {
-  margin: 15px 5px 0 0;
+  margin: 15px 6px 0 0;
 }
 .high-contrast .glass,
-.high-contrast .panel {
+.high-contrast .panel,
+.high-contrast .weapon-hud,
+.high-contrast .pilot,
+.high-contrast .choice:not(.selected) {
   background: #071012;
 }
 .high-contrast {
   --muted: #d3ddd4;
 }
+.high-contrast #app::before {
+  background: #070b0ef2 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @media (max-width: 1100px) {
   .hud-health {
-    min-width: 190px;
+    width: 250px;
   }
   .hud-weapons {
     left: auto;
     right: 24px;
     transform: none;
+  }
+  .weapon-hud {
+    width: 184px;
   }
   .shell {
     padding-top: 4vh;
@@ -650,10 +1630,10 @@ kbd {
     max-width: 520px;
   }
   h1 {
-    font-size: 58px;
+    font-size: 60px;
   }
   .machine-caption {
-    max-width: 190px;
+    max-width: 200px;
   }
   .pilot-name {
     display: none;
@@ -663,6 +1643,10 @@ kbd {
   header {
     height: 75px;
     padding: 0 20px;
+  }
+  header::after {
+    left: 20px;
+    right: 20px;
   }
   .brand-sub,
   nav .connection,
@@ -675,28 +1659,33 @@ kbd {
   .shell {
     padding: 25px 20px 80px;
   }
+  body:not(.in-game) #app::before {
+    background: linear-gradient(0deg, #070b0ef0 0%, #070b0ec0 55%, #070b0e55 100%);
+  }
   .panel {
     width: 100%;
     max-width: 490px;
-    background: #142024df;
-    padding: 20px;
+    padding-left: 18px;
   }
   h1 {
-    font-size: 49px;
+    font-size: 50px;
   }
   footer {
-    font-size: 11px;
+    font-size: 10px;
     letter-spacing: 0;
   }
   .hud-roster {
     top: 12px;
     left: 12px;
-    min-width: 150px;
-    padding: 8px;
+    width: 150px;
+    padding: 6px 10px;
   }
   .hud-timer {
     top: 12px;
-    padding: 8px 15px;
+    padding: 6px 22px;
+  }
+  .hud-timer strong {
+    font-size: 30px;
   }
   .hud-menu {
     top: 12px;
@@ -704,17 +1693,29 @@ kbd {
   }
   .hud-menu button {
     padding: 10px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .hud-menu .connection {
     max-width: 95px;
-    font-size: 11px;
+    font-size: 10px;
+  }
+  .kill-feed {
+    top: 80px;
+    right: 12px;
+  }
+  .kill-feed li {
+    font-size: 13px;
+    padding: 5px 10px;
   }
   .hud-health {
-    bottom: 140px;
+    bottom: 128px;
     left: 12px;
-    padding: 12px;
-    min-width: 170px;
+    width: 230px;
+    height: 60px;
+    padding: 0 12px;
+  }
+  .hud-health strong {
+    font-size: 38px;
   }
   .hud-weapons {
     left: 12px;
@@ -723,23 +1724,48 @@ kbd {
   }
   .weapon-hud {
     flex: 1;
+    width: auto;
+    height: auto;
     min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
     padding: 10px;
+    gap: 6px;
+  }
+  .weapon-hud .ring {
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
+  }
+  .weapon-hud kbd {
+    display: none;
   }
   .weapon-hud strong {
-    flex-wrap: wrap;
-    gap: 4px;
-    min-height: 32px;
+    font-size: 14px;
+    white-space: normal;
   }
-  .results {
+  .combat-message {
+    font-size: 28px;
+  }
+  .center-card {
     min-width: 0;
-    width: 94vw;
-    padding: 20px;
+    width: 90vw;
+  }
+  .results td {
+    padding: 8px;
+    font-size: 15px;
+  }
+  .results td:nth-child(2) {
+    font-size: 16px;
+  }
+  .results tr.winner td:nth-child(2)::after {
+    content: ' ★';
   }
   .spectator {
-    bottom: 245px;
+    bottom: 235px;
     width: 90vw;
     justify-content: center;
+    flex-wrap: wrap;
   }
   .spec-strip {
     gap: 20px;
@@ -756,28 +1782,28 @@ kbd {
 }
 .garage h1 {
   font-size: clamp(42px, 4.5vw, 64px);
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 .garage .lede {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 .garage .choices {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 .garage .choice {
   padding: 12px 10px;
-  min-height: 116px;
+  min-height: 112px;
   justify-content: space-between;
 }
 .garage .choice strong {
-  font-size: 12px;
+  font-size: 15px;
 }
 .garage .choice small {
-  font-size: 11px;
+  font-size: 10px;
 }
 .garage .weapon-symbol {
-  font-size: 23px;
+  font-size: 28px;
 }
 @media (max-width: 1000px) {
   .garage .choices {
@@ -799,21 +1825,25 @@ kbd {
 .cinematic .cinematic-caption {
   display: flex;
   position: fixed;
-  bottom: 7vh;
+  bottom: 8vh;
   left: 8%;
   right: 8%;
   align-items: center;
   justify-content: space-between;
   pointer-events: auto;
-  letter-spacing: 0.22em;
-  color: #f6d993;
-  text-shadow: 0 2px 8px #000;
+  font: 800 26px var(--display);
+  letter-spacing: 0.3em;
+  color: var(--accent-hot);
+  text-shadow: 0 2px 10px #000;
+  animation: enter-up 0.6s both;
 }
 .cinematic .results,
 .cinematic .hud-health,
 .cinematic .hud-weapons,
 .cinematic .hud-roster,
 .cinematic .hud-timer,
+.cinematic .kill-feed,
+.cinematic .vignette,
 .cinematic .combat-message {
   visibility: hidden;
 }
@@ -823,16 +1853,22 @@ body.cinematic::after {
   position: fixed;
   left: 0;
   right: 0;
-  height: 5vh;
-  background: #080c0e;
+  height: 7vh;
+  background: #05080a;
   z-index: 3;
   pointer-events: none;
+  animation: bars 0.5s ease-out both;
 }
 body.cinematic::before {
   top: 0;
 }
 body.cinematic::after {
   bottom: 0;
+}
+@keyframes bars {
+  from {
+    height: 0;
+  }
 }
 
 #touch-controls,
@@ -898,6 +1934,7 @@ body.cinematic::after {
     padding: 0;
     border: none;
     border-radius: 50%;
+    clip-path: none;
     color: #e7e6df;
     text-align: center;
     line-height: 1;
@@ -992,6 +2029,7 @@ body.cinematic::after {
     box-sizing: border-box;
     padding: 4px 12px;
     min-width: 0;
+    width: auto;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -1021,6 +2059,7 @@ body.cinematic::after {
     background: #f0a04b;
   }
   body.in-game .low-health .meter i {
+    background: var(--danger);
     animation: low-pulse 0.8s ease-in-out infinite alternate;
   }
   @keyframes low-pulse {
@@ -1088,5 +2127,190 @@ body.cinematic::after {
       calc(50% - 4px) 50%,
       calc(50% + 4px) 50%;
     background-repeat: no-repeat;
+  }
+}
+
+/* Lobby fits a 900px-tall viewport with the actions in view. */
+.lobby h1 {
+  font-size: clamp(44px, 4.4vw, 68px);
+  margin-bottom: 14px;
+}
+.lobby .roster {
+  margin: 12px 0;
+}
+.lobby .pilot {
+  padding-block: 9px;
+}
+.lobby .pilot .swatch {
+  height: 34px;
+}
+.lobby .actions {
+  margin-top: 14px;
+}
+.panel > button.primary {
+  display: inline-flex;
+}
+/* Settings checkboxes as switches. */
+.setting input {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 44px;
+  height: 24px;
+  margin: 0;
+  border-radius: 12px;
+  background: #ffffff1f;
+  box-shadow: inset 0 0 0 1px #ffffff38;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.setting input::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #cfd3cb;
+  transition: transform 0.2s;
+}
+.setting input:checked {
+  background: var(--accent);
+}
+.setting input:checked::after {
+  background: #1a1a12;
+  transform: translateX(20px);
+}
+.setting input:focus-visible {
+  outline: 3px solid var(--accent-hot);
+  outline-offset: 3px;
+}
+.modal > button.primary {
+  display: inline-flex;
+}
+/* Pinned just above the footer so it never overlaps the preview machine. */
+.machine-caption {
+  position: absolute;
+  right: 5vw;
+  bottom: 72px;
+  margin: 0;
+}
+.countdown b {
+  filter: drop-shadow(0 6px 18px #000c);
+}
+
+/* In combat the link badge only speaks up when something is wrong. */
+#hud .connection.connected {
+  display: none;
+}
+#hud .connection {
+  --cut: 6px;
+  clip-path: var(--chamfer);
+  display: inline-block;
+  padding: 5px 9px;
+  background: #3a1a0ee6;
+  color: #ffc9a8;
+}
+/* Results stay in the left ~45% so the finale robot reads on its own. */
+.results {
+  background: linear-gradient(90deg, #05080ad9 0%, #05080ab3 28%, #05080a40 44%, #05080a00 52%);
+}
+.results {
+  padding-left: 5vw;
+}
+.results-card {
+  width: min(470px, 36vw);
+}
+.results h1 {
+  font-size: clamp(56px, 7vw, 108px);
+}
+.results td {
+  padding: 9px 10px;
+  font-size: 16px;
+}
+.results td:nth-child(2),
+.results tr.winner td {
+  font-size: 18px;
+}
+.results th {
+  padding: 0 10px 4px;
+}
+@media (max-width: 760px) {
+  .results {
+    padding: 16px;
+    background: #05080acc;
+  }
+  .results-card {
+    width: 100%;
+  }
+}
+/* Lobby room tag uses the same chip language as the READY badges. */
+.room-code > span {
+  --cut: 7px;
+  font: 800 20px/1 var(--display);
+  letter-spacing: 2px;
+  padding: 8px 14px 7px;
+  color: var(--accent);
+  background: #ecc05c1a;
+  box-shadow: inset 0 0 0 1px #ecc05c66;
+}
+
+/* Results: one rank-chip style, podium accents, solid backing behind the rows. */
+.results table {
+  --cut: 10px;
+  clip-path: var(--chamfer);
+  background: #070b0ee6;
+  border-spacing: 0 4px;
+  padding: 0 6px;
+}
+.results th:first-child {
+  padding-left: 14px;
+}
+.results td:first-child,
+.results tr.winner td:first-child {
+  --rank: #8b958f;
+  width: 50px;
+  font-size: 20px;
+  color: var(--rank);
+  background: #1a2328;
+  box-shadow: inset 3px 0 0 var(--rank);
+  clip-path: none;
+}
+.results tbody tr:nth-child(1) td:first-child {
+  --rank: #f2c75e;
+  font-size: 24px;
+}
+.results tbody tr:nth-child(2) td:first-child {
+  --rank: #cfd8dc;
+}
+.results tbody tr:nth-child(3) td:first-child {
+  --rank: #d0894e;
+}
+/* Timer plate holds contrast against a bright skyline. */
+.hud-timer {
+  background: linear-gradient(180deg, #0b1114f5, #0b1114e6);
+}
+.hud-timer strong {
+  text-shadow: 0 2px 8px #000;
+}
+/* Lobby rows: no backdrop blur, so the city behind isn't cut by a hard glass edge. */
+.pilot {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: linear-gradient(90deg, #141d22f0, #10181cd0);
+}
+body:not(.in-game) #app::before {
+  background:
+    linear-gradient(90deg, #070b0ee6 0%, #070b0eb8 28%, #070b0e70 44%, #070b0e28 58%, #070b0e00 72%),
+    linear-gradient(0deg, #070b0ecc 0%, #070b0e00 22%),
+    linear-gradient(180deg, #070b0e99 0%, #070b0e00 16%);
+}
+.pilot {
+  background: linear-gradient(90deg, #141d22f0 0%, #10181cd0 65%, #10181c80 100%);
+}
+@media (max-width: 760px) {
+  body:not(.in-game) #app::before {
+    background: linear-gradient(0deg, #070b0ef0 0%, #070b0ec0 55%, #070b0e55 100%);
   }
 }
