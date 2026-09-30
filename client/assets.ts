@@ -6,18 +6,16 @@ import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
  * Vite serves and copies them verbatim. Getters are lazy and cached: textures are returned immediately
  * and fill in when the image arrives, so callers never await (the sky is the one async asset).
  */
-export const PBR_SETS = {
+const PBR_SETS = {
   floor: 'concrete_floor_worn_001', // arena floor / roofs
   paint: 'blue_metal_plate', // painted steel: use luminance of diff as detail, tint with player colour
-  rust: 'rust_coarse_01', // corrosion under chipped paint
   steel: 'rusty_metal_04', // raw scratched steel / gunmetal
-  rubber: 'rubberized_track', // tyres: normal + roughness only (no diff shipped)
+  rubber: 'rubberized_track', // tyres: roughness only
   facade: 'concrete_wall_008', // city building walls
 } as const;
 export type PbrSet = keyof typeof PBR_SETS;
 /** diff = sRGB albedo, nor = OpenGL normal, arm = R ambient occlusion / G roughness / B metalness. */
 export type PbrMap = 'diff' | 'nor' | 'arm';
-export const SKY_HDRI = 'belfast_sunset_puresky';
 
 const base = import.meta.env.BASE_URL + 'assets/';
 const cache = new Map<string, THREE.Texture>();

@@ -78,7 +78,7 @@ export const tanhCurve = (drive: number, size = 2048) => {
  * Chromium's DynamicsCompressor adds automatic make-up gain of 0.6 x the gain reduction it
  * would apply at 0 dBFS; this gain cancels it so a compressor only ever turns things down.
  */
-export const makeupCancel = (threshold: number, ratio: number) =>
+const makeupCancel = (threshold: number, ratio: number) =>
   10 ** ((-0.6 * -threshold * (1 - 1 / ratio)) / 20);
 
 function compressor(

@@ -29,19 +29,7 @@ See [`package.json`](package.json) for build, formatting, and test commands.
 
 Browser checks require Google Chrome and a running local game. Run `npm run test:browser` in a separate terminal; set `BROWSER_URL` if using a different address.
 
-Checks performed for the presentation changes:
-
-- `npm run typecheck` — TypeScript correctness.
-- `node --import tsx --test tests/*.test.ts` — 43 existing game, bot, multiplayer, and rendering tests.
-- `node --import tsx --test tests/finale.test.ts tests/weapon-effects.test.ts` — Cinematic triggers, cleanup, state isolation, and effect pooling.
-- `npm run build` — Production browser and server builds.
-- `npm run format:check` — Repository formatting.
-- `node scripts/presentation-browser-check.mjs` — Center skyline, grounded hits, edge view, final fall, expiry, and round reset.
-- `node scripts/bots-browser-check.mjs` — Solo combat, results, rematch, and leaving.
-- Screenshot inspection — Checked edge framing and the falling robot visually.
-- `git diff --check` and `git status --short` — Whitespace errors and uncommitted changes.
-
-The direct Node test command bypassed a sandbox restriction on the `npm test` runner's IPC socket. Browser checks completed without page errors.
+Other checks in `scripts/*-check.mjs` cover individual features; run them with `node scripts/<name>.mjs`. Screenshots go to `artifacts/`.
 
 See [combat presentation](docs/combat-presentation.md) for the effects, cinematic, settings, and city details.
 
@@ -57,4 +45,4 @@ Run a single game server instance. Rooms are kept in memory, so restarting or de
 
 Inspired by the RobotRage genre, with original procedural models, effects, and music. Dependencies retain their respective licenses. Barlow Condensed and IBM Plex Sans are provided through Google Fonts under the SIL Open Font License.
 
-Scanned PBR textures and the sky HDRI are from [Poly Haven](https://polyhaven.com) under CC0 1.0 (public domain): concrete_floor_worn_001, blue_metal_plate, rust_coarse_01, rusty_metal_04, rubberized_track, concrete_wall_008 and belfast_sunset_puresky. See `client/assets.ts`.
+Scanned PBR textures and the sky HDRI are from [Poly Haven](https://polyhaven.com) under CC0 1.0 (public domain): concrete_floor_worn_001, blue_metal_plate, rusty_metal_04, rubberized_track, concrete_wall_008 and belfast_sunset_puresky. See `client/assets.ts`.

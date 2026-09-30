@@ -200,20 +200,6 @@ export const FRONT_RULES = {
   hammer: { aim: 0.65, push: 14, continuous: false },
   drill: { aim: 0.85, push: 0, continuous: true },
 } as const;
-export const WEAPON_ICONS = {
-  ram: '▰',
-  wedge: '◢',
-  sweeper: '↦',
-  flipper: '⇧',
-  hook: '↶',
-  saw: '✹',
-  hammer: '⚒',
-  drill: '⟫',
-  cannon: '⊙',
-  flamethrower: '♨',
-  scattergun: '⁙',
-  railgun: 'ϟ',
-} as const;
 export function isFrontWeapon(value: unknown): value is FrontWeapon {
   return FRONT_WEAPONS.some((key) => key === value);
 }

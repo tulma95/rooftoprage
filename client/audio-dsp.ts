@@ -2,7 +2,7 @@
 // debris grains and the engine models. No Web Audio here, so everything is unit-testable.
 
 /** Small deterministic PRNG, so every variant is reproducible. */
-export function rng(seed: number) {
+function rng(seed: number) {
   let s = seed >>> 0 || 1;
   return () => (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296;
 }
@@ -113,7 +113,7 @@ export function renderModes(
 }
 
 /** Scales stereo channels to unit total energy, so a send level alone sets the wet level. */
-export function unitEnergy(chs: Float32Array[]) {
+function unitEnergy(chs: Float32Array[]) {
   let sum = 0;
   for (const ch of chs) for (const x of ch) sum += x * x;
   const k = 1 / Math.sqrt(sum / chs.length || 1);
